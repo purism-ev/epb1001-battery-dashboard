@@ -1,0 +1,1440 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>誠屏 EPB-1001 電池監控平台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: fixed petrol sidebar + scrolling work area; summary tiles on top, detail below; one slide-in drawer per battery module. */
+:root{
+  --bg:#eef2f3; --surface:#ffffff; --surface-2:#f5f8f8; --ink:#0e1b1e; --ink-2:#465659; --ink-3:#6f8186;
+  --line:#dbe3e5; --line-2:#c6d2d5;
+  --accent:#0c6473; --accent-ink:#ffffff; --accent-soft:#e0eef0;
+  --side:#0d2a31; --side-ink:#d3e6ea; --side-ink-2:#8eb0b7; --side-active:#174550;
+  --good:#0ca30c; --warn:#fab219; --crit:#d03b3b; --off:#8a979a;
+  --good-soft:#e2f3e2; --warn-soft:#fff2d3; --crit-soft:#fbe4e4; --off-soft:#e9eeef;
+  --good-ink:#096609; --warn-ink:#7f5300; --crit-ink:#a32323; --off-ink:#4f5d60;
+  --s1:#2a78d6; --s2:#eb6834;
+  --font:'IBM Plex Sans','Noto Sans TC',system-ui,-apple-system,'PingFang TC','Microsoft JhengHei',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,'SFMono-Regular',Menlo,monospace;
+  --r:10px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0a1113; --surface:#111a1d; --surface-2:#162226; --ink:#e5eef0; --ink-2:#a5b5b9; --ink-3:#7a8d92;
+    --line:#213034; --line-2:#2c3e43;
+    --accent:#47b4c3; --accent-ink:#04171b; --accent-soft:#12323a;
+    --side:#07181c; --side-ink:#d3e6ea; --side-ink-2:#7fa1a8; --side-active:#123942;
+    --good-soft:#12301a; --warn-soft:#3a2c0c; --crit-soft:#3b1717; --off-soft:#1c282b;
+    --good-ink:#62d462; --warn-ink:#f7c14f; --crit-ink:#f28585; --off-ink:#a9b6b9;
+    --s1:#3987e5; --s2:#d95926;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0a1113; --surface:#111a1d; --surface-2:#162226; --ink:#e5eef0; --ink-2:#a5b5b9; --ink-3:#7a8d92;
+  --line:#213034; --line-2:#2c3e43;
+  --accent:#47b4c3; --accent-ink:#04171b; --accent-soft:#12323a;
+  --side:#07181c; --side-ink:#d3e6ea; --side-ink-2:#7fa1a8; --side-active:#123942;
+  --good-soft:#12301a; --warn-soft:#3a2c0c; --crit-soft:#3b1717; --off-soft:#1c282b;
+  --good-ink:#62d462; --warn-ink:#f7c14f; --crit-ink:#f28585; --off-ink:#a9b6b9;
+  --s1:#3987e5; --s2:#d95926;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+h1,h2,h3{margin:0;text-wrap:balance;font-weight:600}
+.num,.mono{font-variant-numeric:tabular-nums}
+.mono{font-family:var(--mono);font-size:.92em}
+
+.app{display:grid;grid-template-columns:228px minmax(0,1fr);height:100%}
+.side{background:var(--side);color:var(--side-ink);display:flex;flex-direction:column;padding:18px 12px;gap:18px;overflow-y:auto}
+.brand{display:flex;flex-direction:column;gap:2px;padding:0 8px}
+.brand b{font-size:15px;letter-spacing:.02em;white-space:nowrap}
+.brand span{font-size:12px;color:var(--side-ink-2)}
+.brand .co{display:flex;align-items:center;gap:8px;margin-top:10px;padding:8px 10px;border:1px solid rgba(255,255,255,.1);border-radius:8px;font-size:12px;color:var(--side-ink)}
+.brand .co i{width:8px;height:8px;border-radius:50%;background:#3fd17d;flex:none}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav a{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;color:var(--side-ink);text-decoration:none;font-size:14px}
+.nav a svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none;opacity:.85}
+.nav a:hover{background:rgba(255,255,255,.06)}
+.nav a[aria-current="page"]{background:var(--side-active);color:#fff}
+.nav a .badge{margin-left:auto;background:var(--crit);color:#fff;font-size:11px;border-radius:10px;padding:0 7px;line-height:18px}
+.side .foot{margin-top:auto;font-size:11.5px;color:var(--side-ink-2);padding:0 8px;display:flex;flex-direction:column;gap:6px}
+.demo-chip{display:inline-flex;align-items:center;gap:6px;border:1px dashed rgba(255,255,255,.25);border-radius:6px;padding:3px 8px;color:var(--side-ink);width:max-content}
+
+.main{overflow-y:auto;height:100%;display:flex;flex-direction:column}
+.top{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(6px);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:16px;padding:12px 24px;flex-wrap:wrap}
+.top h1{font-size:19px}
+.top .sub{font-size:12.5px;color:var(--ink-3)}
+.top .tools{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.live{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:4px 11px}
+.live i{width:8px;height:8px;border-radius:50%;background:var(--good);box-shadow:0 0 0 0 color-mix(in srgb,var(--good) 60%,transparent);animation:pulse 2s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--good) 55%,transparent)}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+@media (prefers-reduced-motion: reduce){.live i{animation:none}*{transition:none!important}}
+.sel,.inp{background:var(--surface);border:1px solid var(--line-2);border-radius:8px;padding:6px 10px;height:34px}
+.inp{min-width:0}
+.sel:hover,.inp:hover{border-color:var(--ink-3)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:34px;padding:0 14px;border-radius:8px;border:1px solid var(--line-2);background:var(--surface);font-weight:500;white-space:nowrap}
+.btn:hover{border-color:var(--ink-3);background:var(--surface-2)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.pri:hover{filter:brightness(1.08)}
+.btn.sm{height:28px;padding:0 10px;font-size:12.5px}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn.ghost:hover{background:var(--surface-2)}
+a.lnk,button.lnk{color:var(--accent);background:none;border:0;padding:0;text-decoration:underline;text-underline-offset:2px;font-weight:500}
+
+.view{display:none;padding:20px 24px 40px;flex-direction:column;gap:16px}
+.view.on{display:flex}
+.grid{display:grid;gap:16px}
+.g-kpi{grid-template-columns:repeat(5,minmax(0,1fr))}
+.g-2{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr)}
+.g-2e{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+.card>header{display:flex;align-items:baseline;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.card>header h2{font-size:15px}
+.card>header .hint{font-size:12.5px;color:var(--ink-3)}
+.card>header .r{margin-left:auto;display:flex;gap:8px;align-items:center}
+
+.kpi{position:relative;overflow:hidden;display:flex;flex-direction:column;gap:2px;padding:14px 16px 14px 18px}
+.kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--line-2)}
+.kpi.k-good::before{background:var(--good)} .kpi.k-warn::before{background:var(--warn)} .kpi.k-crit::before{background:var(--crit)} .kpi.k-acc::before{background:var(--accent)}
+.kpi .lbl{font-size:12.5px;color:var(--ink-2)}
+.kpi .val{font-size:28px;font-weight:600;line-height:1.15;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.kpi .val small{font-size:14px;color:var(--ink-3);font-weight:500;margin-left:2px}
+.kpi .foot{font-size:12px;color:var(--ink-3)}
+.kpi button.kpi-link{all:unset;cursor:pointer;position:absolute;inset:0;border-radius:var(--r)}
+.kpi button.kpi-link:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.kpi:has(.kpi-link):hover{border-color:var(--line-2);background:var(--surface-2)}
+.delta-down{color:var(--crit-ink)} .delta-up{color:var(--good-ink)}
+
+/* status pills: shape + label, never color alone */
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:2px 9px 2px 8px;border-radius:20px;white-space:nowrap;line-height:18px}
+.pill::before{content:"";width:8px;height:8px;flex:none}
+.pill.good{background:var(--good-soft);color:var(--good-ink)} .pill.good::before{background:var(--good);border-radius:50%}
+.pill.warn{background:var(--warn-soft);color:var(--warn-ink)} .pill.warn::before{background:var(--warn);clip-path:polygon(50% 0,100% 100%,0 100%);width:10px;height:9px}
+.pill.crit{background:var(--crit-soft);color:var(--crit-ink)} .pill.crit::before{background:var(--crit);border-radius:1px}
+.pill.off{background:var(--off-soft);color:var(--off-ink)} .pill.off::before{background:var(--off);border-radius:50%;box-shadow:inset 0 0 0 2px var(--off-soft)}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;padding:1px 7px;border-radius:5px;background:var(--surface-2);border:1px solid var(--line);color:var(--ink-2);white-space:nowrap}
+.chip.veto{background:var(--crit-soft);border-color:transparent;color:var(--crit-ink);font-weight:600}
+.st-ic{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--ink-2);white-space:nowrap}
+.st-ic svg{width:13px;height:13px;flex:none}
+.st-ic.chg svg{fill:var(--s1);stroke:none} .st-ic.dis svg{fill:none;stroke:var(--s2);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.st-ic.idle svg{fill:none;stroke:var(--ink-3);stroke-width:2.4;stroke-linecap:round} .st-ic.off svg{fill:none;stroke:var(--off);stroke-width:2;stroke-linecap:round}
+
+/* priority risk list */
+.risk{display:flex;flex-direction:column}
+.risk li{list-style:none;display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 4px;border-top:1px solid var(--line)}
+.risk li:first-child{border-top:0}
+.risk .rk{font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums;text-align:center}
+.risk .t{display:flex;flex-direction:column;min-width:0}
+.risk .t b{font-weight:600;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.risk .t span{font-size:12.5px;color:var(--ink-2)}
+ul.risk{margin:0;padding:0}
+
+/* distribution bar */
+.dist{display:flex;height:26px;gap:2px;border-radius:6px;overflow:hidden}
+.dist>div{display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#fff;min-width:22px}
+.dist .d-good{background:var(--good)} .dist .d-warn{background:var(--warn);color:#3b2800} .dist .d-crit{background:var(--crit)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:10px;height:10px;border-radius:2px;display:inline-block;flex:none}
+.site-rows{display:flex;flex-direction:column;gap:10px;margin-top:4px}
+.site-row{display:grid;grid-template-columns:92px minmax(0,1fr) 54px;gap:10px;align-items:center;font-size:12.5px}
+.site-row .dist{height:14px;border-radius:4px}
+.site-row .dist>div{font-size:0;min-width:3px}
+.ops{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.ops div{background:var(--surface-2);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:2px}
+.ops b{font-size:20px;font-variant-numeric:tabular-nums;font-weight:600}
+.sect-lbl{font-size:12px;color:var(--ink-3);margin:14px 0 8px;font-weight:500}
+
+/* battery wall */
+.wall-site{display:flex;flex-direction:column;gap:8px}
+.wall-site+.wall-site{margin-top:16px}
+.wall-site h3{font-size:13px;color:var(--ink-2);font-weight:600;display:flex;gap:8px;align-items:baseline}
+.wall-site h3 span{font-weight:400;color:var(--ink-3)}
+.wall{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:8px}
+.dev{border:1px solid var(--line);border-radius:8px;padding:7px;background:var(--surface-2);display:flex;flex-direction:column;gap:6px}
+.dev .dh{display:flex;justify-content:space-between;gap:6px;font-size:11.5px;color:var(--ink-3);padding:0 2px}
+.dev .dh b{color:var(--ink);font-family:var(--mono);font-weight:500}
+.dev .dh span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mods{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.mod{all:unset;cursor:pointer;position:relative;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 6px 6px 9px;display:flex;flex-direction:column;gap:3px;overflow:hidden}
+.mod:hover{border-color:var(--ink-3)}
+.mod:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.mod::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--good)}
+.mod.warn::before{background:var(--warn)} .mod.crit::before{background:var(--crit)}
+.mod .mt{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--ink-3)}
+.mod .mt .shape{width:8px;height:8px;background:var(--good);border-radius:50%}
+.mod.warn .mt .shape{background:var(--warn);border-radius:0;clip-path:polygon(50% 0,100% 100%,0 100%);width:9px}
+.mod.crit .mt .shape{background:var(--crit);border-radius:1px}
+.mod .soc{font-size:17px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1}
+.mod .bar{height:4px;background:var(--line);border-radius:2px;overflow:hidden}
+.mod .bar i{display:block;height:100%;background:var(--ink-3);border-radius:2px}
+.mod .mb{display:flex;justify-content:space-between;font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.mod.offl .soc{color:var(--ink-3)}
+
+/* alerts feed */
+.feed{display:flex;flex-direction:column;margin:0;padding:0}
+.feed li{list-style:none;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;padding:9px 2px;border-top:1px solid var(--line);align-items:start;font-size:13px}
+.feed li:first-child{border-top:0}
+.feed .when{font-size:12px;color:var(--ink-3);white-space:nowrap;font-variant-numeric:tabular-nums}
+.sev{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font-size:12px;font-weight:700}
+.sev.crit{background:var(--crit-soft);color:var(--crit-ink)} .sev.warn{background:var(--warn-soft);color:var(--warn-ink)} .sev.info{background:var(--accent-soft);color:var(--accent)}
+.feed .new{animation:flash 1.6s ease-out}
+@keyframes flash{from{background:var(--accent-soft)}to{background:transparent}}
+
+/* tables */
+.tbl-wrap{overflow-x:auto;margin:0 -16px;padding:0 16px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{font-weight:500;color:var(--ink-3);font-size:12px;text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+tbody tr:last-child td{border-bottom:0}
+tr.clk{cursor:pointer}
+tr.clk:hover td{background:var(--surface-2)}
+td.r,th.r{text-align:right}
+th button{all:unset;cursor:pointer;display:inline-flex;gap:4px;align-items:center}
+th button:hover{color:var(--ink)}
+th button:focus-visible{outline:2px solid var(--accent)}
+th[aria-sort] button{color:var(--ink)}
+.scorebar{display:flex;align-items:center;gap:8px;min-width:120px}
+.scorebar .trk{flex:1;height:6px;background:var(--line);border-radius:3px;position:relative;overflow:hidden}
+.scorebar .trk i{position:absolute;left:0;top:0;bottom:0;border-radius:3px}
+.scorebar b{font-variant-numeric:tabular-nums;width:24px;text-align:right;font-weight:600}
+.socbar{display:flex;align-items:center;gap:6px;min-width:84px}
+.socbar .trk{width:44px;height:6px;background:var(--line);border-radius:3px;overflow:hidden}
+.socbar .trk i{display:block;height:100%;background:var(--ink-3)}
+.idcell{font-family:var(--mono);font-weight:500;white-space:nowrap}
+.sub2{font-size:12px;color:var(--ink-3)}
+
+/* toolbar */
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.search{position:relative;flex:1 1 220px;max-width:320px}
+.search svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:15px;height:15px;stroke:var(--ink-3);fill:none;stroke-width:2}
+.search input{width:100%;padding-left:32px}
+.count{font-size:12.5px;color:var(--ink-3);margin-left:auto}
+.pager{display:flex;gap:4px;align-items:center;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
+.pager button{min-width:30px;height:30px;border-radius:6px;border:1px solid var(--line);background:var(--surface);font-variant-numeric:tabular-nums}
+.pager button[aria-current="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.seg{display:inline-flex;border:1px solid var(--line-2);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:none;padding:0 12px;height:30px;font-size:13px;color:var(--ink-2)}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+
+/* heatmap */
+.hm{display:grid;gap:2px;font-size:11.5px;overflow-x:auto}
+.hm .hc{height:28px;border-radius:3px;display:grid;place-items:center;font-variant-numeric:tabular-nums;font-weight:600;min-width:46px}
+.hm .hh{color:var(--ink-3);font-size:11px;text-align:center;padding:0 2px 4px;line-height:1.25;align-self:end}
+.hm .hr{font-family:var(--mono);font-size:12px;display:flex;align-items:center;padding-right:8px;white-space:nowrap}
+.hm .hr button{all:unset;cursor:pointer;color:var(--ink)}
+.hm .hr button:hover{color:var(--accent);text-decoration:underline}
+.b-good{background:var(--good-soft);color:var(--good-ink)}
+.b-warn{background:var(--warn);color:#3b2800}
+.b-crit{background:var(--crit);color:#fff}
+.b-mid{background:color-mix(in srgb,var(--warn) 35%,var(--surface));color:var(--warn-ink)}
+
+/* drawer */
+.scrim{position:fixed;inset:0;background:rgba(5,15,18,.38);z-index:40;opacity:0;pointer-events:none;transition:opacity .2s}
+.scrim.on{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(600px,100%);background:var(--bg);z-index:41;transform:translateX(102%);transition:transform .25s ease;display:flex;flex-direction:column;box-shadow:-12px 0 32px rgba(0,0,0,.18)}
+.drawer.on{transform:none}
+.drawer .dhd{padding:16px 20px;border-bottom:1px solid var(--line);background:var(--surface);display:flex;gap:12px;align-items:flex-start}
+.drawer .dhd h2{font-size:18px;font-family:var(--mono);font-weight:600;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.drawer .dhd .meta{font-size:12.5px;color:var(--ink-3);margin-top:2px}
+.drawer .dbody{overflow-y:auto;padding:16px 20px 32px;display:flex;flex-direction:column;gap:14px}
+.x{margin-left:auto;width:34px;height:34px;border-radius:8px;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center;flex:none}
+.x svg{width:16px;height:16px;stroke:var(--ink-2);stroke-width:2;fill:none;stroke-linecap:round}
+.verdict{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;align-items:center}
+.bigscore{display:flex;flex-direction:column;align-items:center;justify-content:center;width:92px;height:92px;border-radius:50%;border:6px solid var(--good)}
+.bigscore.warn{border-color:var(--warn)} .bigscore.crit{border-color:var(--crit)}
+.bigscore b{font-size:28px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+.bigscore span{font-size:11px;color:var(--ink-3)}
+.action{border-radius:8px;padding:10px 12px;background:var(--surface-2);border:1px solid var(--line);font-size:13px;display:flex;flex-direction:column;gap:4px}
+.action.warn{background:var(--warn-soft);border-color:transparent} .action.crit{background:var(--crit-soft);border-color:transparent}
+.action b{font-weight:600}
+.lt{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.lt .tile{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.lt .tile .lbl{font-size:12px;color:var(--ink-3)}
+.lt .tile .v{font-size:20px;font-weight:600;font-variant-numeric:tabular-nums}
+.lt .tile .v small{font-size:12px;color:var(--ink-3);font-weight:500;margin-left:4px}
+.ind{display:flex;flex-direction:column}
+.ind .row{display:grid;grid-template-columns:110px minmax(0,1fr) 96px 30px;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--line);font-size:13px}
+.ind .row:first-child{border-top:0}
+.ind .row .raw{font-size:12.5px;color:var(--ink-2);text-align:right;font-variant-numeric:tabular-nums}
+.ind .row .trk{height:8px;background:var(--line);border-radius:4px;position:relative}
+.ind .row .trk i{position:absolute;left:0;top:0;bottom:0;border-radius:4px}
+.ind .row .trk em{position:absolute;top:-3px;bottom:-3px;width:1px;background:var(--ink-3);opacity:.6}
+.ind .row b{text-align:right;font-variant-numeric:tabular-nums}
+.dcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.dcard h3{font-size:13.5px;margin-bottom:10px;display:flex;gap:8px;align-items:baseline}
+.dcard h3 span{font-weight:400;font-size:12px;color:var(--ink-3)}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap}
+
+/* chart bits */
+.chart{position:relative;width:100%}
+.chart svg{display:block;overflow:visible}
+.chart text{font-family:var(--font);font-size:11px;fill:var(--ink-3);font-variant-numeric:tabular-nums}
+#tip{position:fixed;z-index:100;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12px;line-height:1.45;padding:7px 10px;border-radius:7px;max-width:260px;opacity:0;transition:opacity .08s;box-shadow:0 4px 14px rgba(0,0,0,.2)}
+#tip.on{opacity:1}
+#tip b{font-weight:600}
+#tip .tr{display:flex;align-items:center;gap:6px;font-variant-numeric:tabular-nums}
+#tip .tr i{width:8px;height:8px;border-radius:2px;flex:none}
+
+/* chat */
+.chatwrap{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;min-height:calc(100vh - 140px)}
+.chat{display:flex;flex-direction:column;padding:0;overflow:hidden;min-height:560px}
+.chat .chd{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.chat .chd h2{font-size:15px}
+.aistat{font-size:12px;display:inline-flex;align-items:center;gap:6px;color:var(--ink-2)}
+.aistat i{width:8px;height:8px;border-radius:50%;background:var(--good)}
+.aistat.offline i{background:var(--off)}
+.msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px;background:var(--surface-2)}
+.msg{max-width:min(640px,88%);display:flex;flex-direction:column;gap:6px}
+.msg .bub{padding:10px 14px;border-radius:12px;font-size:14px;line-height:1.6}
+.msg.u{align-self:flex-end}
+.msg.u .bub{background:var(--accent);color:var(--accent-ink);border-bottom-right-radius:4px}
+.msg.a .bub{background:var(--surface);border:1px solid var(--line);border-bottom-left-radius:4px}
+.msg .who{font-size:11.5px;color:var(--ink-3)}
+.msg.u .who{text-align:right}
+.bub p{margin:0 0 6px}.bub p:last-child{margin:0}
+.bub ul,.bub ol{margin:4px 0 6px;padding-left:20px}
+.bub li{margin:2px 0}
+.bub code{font-family:var(--mono);font-size:.9em;background:var(--surface-2);padding:0 4px;border-radius:4px}
+.mchip{all:unset;cursor:pointer;font-family:var(--mono);font-size:.92em;font-weight:500;color:var(--accent);background:var(--accent-soft);padding:0 5px;border-radius:4px}
+.mchip:hover{text-decoration:underline}
+.msg .acts{display:flex;gap:6px;flex-wrap:wrap}
+.typing{display:inline-flex;gap:4px;align-items:center;color:var(--ink-3);font-size:13px}
+.composer{display:flex;gap:8px;padding:12px;border-top:1px solid var(--line);background:var(--surface);align-items:flex-end}
+.composer textarea{flex:1;resize:none;min-height:42px;max-height:140px;border:1px solid var(--line-2);border-radius:10px;padding:10px 12px;background:var(--surface)}
+.qp{display:flex;flex-direction:column;gap:6px}
+.qp button{text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--ink)}
+.qp button:hover{border-color:var(--accent);color:var(--accent)}
+.sw-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:13px}
+.sw-row:first-of-type{border-top:0}
+.sw-row span{display:flex;flex-direction:column}
+.sw-row small{color:var(--ink-3);font-size:12px}
+.toggle{appearance:none;width:36px;height:20px;border-radius:10px;background:var(--line-2);position:relative;flex:none;cursor:pointer;margin-top:2px}
+.toggle::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .15s}
+.toggle:checked{background:var(--accent)}
+.toggle:checked::after{left:18px}
+
+/* reports */
+.repwrap{display:grid;grid-template-columns:300px minmax(0,1fr);gap:16px;align-items:start}
+.form{display:flex;flex-direction:column;gap:14px}
+.fld{display:flex;flex-direction:column;gap:6px}
+.fld>label,.fld>.lb{font-size:12.5px;color:var(--ink-2);font-weight:500}
+.presets{display:flex;flex-wrap:wrap;gap:6px}
+.presets button{height:28px;padding:0 10px;border-radius:14px;border:1px solid var(--line-2);background:var(--surface);font-size:12.5px}
+.presets button[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+.dates{display:grid;grid-template-columns:1fr auto 1fr;gap:6px;align-items:center}
+.dates span{color:var(--ink-3);font-size:12px}
+.checks{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.checks label{display:flex;gap:8px;align-items:center}
+.err{color:var(--crit-ink);font-size:12.5px}
+.replist{display:flex;flex-direction:column;gap:4px;margin:0;padding:0}
+.replist li{list-style:none}
+.replist button{all:unset;cursor:pointer;display:flex;flex-direction:column;padding:7px 8px;border-radius:6px;width:calc(100% - 16px);font-size:12.5px}
+.replist button:hover{background:var(--surface-2)}
+.replist small{color:var(--ink-3)}
+.repbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.repbar .note{font-size:12.5px;color:var(--ink-3);margin-left:auto}
+</style>
+<style id="report-css">
+.report{--p-ink:#13201f;--p-ink2:#4d5c5e;--p-ink3:#7a8a8d;--p-line:#dde4e5;--p-soft:#f4f7f7;--p-acc:#0c6473;background:#fff;color:var(--p-ink);border:1px solid #d5dddf;border-radius:6px;padding:36px 40px;font-family:'IBM Plex Sans','Noto Sans TC',system-ui,sans-serif;font-size:13.5px;line-height:1.6;max-width:900px;box-shadow:0 2px 10px rgba(0,0,0,.06);color-scheme:light}
+.report h1{font-size:22px;margin:0 0 4px;font-weight:600;text-wrap:balance}
+.report h2{font-size:15px;margin:26px 0 10px;padding-bottom:6px;border-bottom:2px solid var(--p-acc);font-weight:600;display:flex;gap:8px;align-items:baseline}
+.report h2 span{font-size:12px;color:var(--p-ink3);font-weight:400}
+.report .rmeta{display:flex;flex-wrap:wrap;gap:6px 20px;font-size:12.5px;color:var(--p-ink2);padding-bottom:14px;border-bottom:1px solid var(--p-line)}
+.report .rmeta b{color:var(--p-ink);font-weight:600}
+.report .rhead{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:14px}
+.report .logo{font-size:12px;color:var(--p-ink3);text-align:right;line-height:1.4}
+.report .logo b{display:block;color:var(--p-acc);font-size:14px}
+.report .rk{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:6px}
+.report .rk div{background:var(--p-soft);border-radius:6px;padding:10px 12px}
+.report .rk small{display:block;font-size:11.5px;color:var(--p-ink2)}
+.report .rk b{font-size:21px;font-weight:600;font-variant-numeric:tabular-nums}
+.report .rk em{font-style:normal;font-size:11.5px;color:var(--p-ink3);display:block}
+.report p{margin:6px 0}
+.report ul{margin:6px 0;padding-left:20px}
+.report table{border-collapse:collapse;width:100%;font-size:12.5px}
+.report th{text-align:left;font-weight:600;color:var(--p-ink2);border-bottom:1px solid var(--p-ink3);padding:6px 8px;font-size:12px}
+.report td{border-bottom:1px solid var(--p-line);padding:6px 8px;vertical-align:top;font-variant-numeric:tabular-nums}
+.report .tg{display:inline-block;font-size:11.5px;font-weight:600;padding:0 7px;border-radius:10px;white-space:nowrap}
+.report .tg.good{background:#e2f3e2;color:#096609}.report .tg.warn{background:#fff2d3;color:#7f5300}.report .tg.crit{background:#fbe4e4;color:#a32323}
+.report .hbar{display:grid;grid-template-columns:120px 1fr 40px;gap:8px;align-items:center;font-size:12.5px;margin:4px 0}
+.report .hbar i{display:block;height:12px;background:#0c6473;border-radius:0 3px 3px 0}
+.report .chart text{font-size:10.5px;fill:#7a8a8d;font-family:inherit}
+.report .rfoot{margin-top:28px;padding-top:10px;border-top:1px solid var(--p-line);font-size:11.5px;color:var(--p-ink3);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.report .mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:.92em}
+.report .callout{background:var(--p-soft);border-left:3px solid var(--p-acc);padding:10px 14px;border-radius:0 6px 6px 0;margin:10px 0}
+</style>
+<style>
+@media (max-width:1180px){.g-kpi{grid-template-columns:repeat(3,minmax(0,1fr))}.g-2,.g-2e{grid-template-columns:minmax(0,1fr)}.chatwrap{grid-template-columns:minmax(0,1fr)}.repwrap{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:860px){
+  .app{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
+  .side{flex-direction:row;align-items:center;padding:8px 10px;gap:10px;overflow-x:auto}
+  .brand .co,.brand span,.side .foot{display:none}
+  .nav{flex-direction:row}
+  .nav a{padding:7px 9px;white-space:nowrap;font-size:13px}
+  .top{padding:10px 16px}.view{padding:16px}
+  .g-kpi{grid-template-columns:repeat(2,minmax(0,1fr))}.g-4{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .report{padding:22px 18px}.report .rk{grid-template-columns:repeat(2,1fr)}
+}
+@media (max-width:420px){.g-kpi{grid-template-columns:minmax(0,1fr)}.ops{grid-template-columns:repeat(2,1fr)}.ind .row{grid-template-columns:90px minmax(0,1fr) 30px}.ind .row .raw{display:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side" aria-label="主選單">
+    <div class="brand">
+      <b>PurismEV · BAI</b>
+      <span>Battery Assets Intelligence</span>
+      <div class="co"><i aria-hidden="true"></i>誠屏 Avalue・EPB-1001</div>
+    </div>
+    <nav class="nav" id="nav">
+      <a href="#overview" data-r="overview"><svg viewBox="0 0 24 24"><path d="M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z"/></svg>總覽</a>
+      <a href="#maintenance" data-r="maintenance"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/></svg>維護<span class="badge" id="navBadge"></span></a>
+      <a href="#batteries" data-r="batteries"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>電池列表</a>
+      <a href="#assistant" data-r="assistant"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>AI 助理</a>
+      <a href="#reports" data-r="reports"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6zM14 2v6h6M9 13h8M9 17h6"/></svg>報表</a>
+    </nav>
+    <div class="foot">
+      <span class="demo-chip">展示／模擬資料</span>
+      <span>診斷模型：EPB-1001 NMC 七項指標 v0.3（權重暫定，隨循環數據校準）</span>
+    </div>
+  </aside>
+
+  <div class="main" id="main">
+    <header class="top">
+      <div>
+        <h1 id="pgTitle">總覽</h1>
+        <div class="sub" id="pgSub"></div>
+      </div>
+      <div class="tools">
+        <label class="sr" for="siteSel" style="position:absolute;left:-9999px">院區</label>
+        <select class="sel" id="siteSel" aria-label="院區">
+          <option value="all">全部院區</option>
+        </select>
+        <span class="live" title="模擬即時資料，每 2 秒更新"><i aria-hidden="true"></i><span>即時</span><span class="num" id="clock"></span></span>
+      </div>
+    </header>
+
+    <section class="view" id="v-overview" aria-label="總覽"></section>
+    <section class="view" id="v-maintenance" aria-label="維護"></section>
+    <section class="view" id="v-batteries" aria-label="電池列表"></section>
+    <section class="view" id="v-assistant" aria-label="AI 助理"></section>
+    <section class="view" id="v-reports" aria-label="報表"></section>
+  </div>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="電池模組詳細資訊" aria-hidden="true">
+  <div class="dhd" id="drHead"></div>
+  <div class="dbody" id="drBody"></div>
+</aside>
+<div id="tip" role="tooltip"></div>
+
+<script>
+'use strict';
+/* ============================================================
+   Utilities
+   ============================================================ */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+function mulberry(seed){ return function(){ seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const R = mulberry(20261109);
+const rand = (a, b) => a + R() * (b - a);
+const randi = (a, b) => Math.floor(rand(a, b + 1));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const f0 = v => Math.round(v).toString();
+const f1 = v => (Math.round(v * 10) / 10).toFixed(1);
+const f2 = v => (Math.round(v * 100) / 100).toFixed(2);
+function lerpMap(v, pts){
+  if (v <= pts[0][0]) return pts[0][1];
+  for (let i = 1; i < pts.length; i++){
+    if (v <= pts[i][0]){ const [x0, y0] = pts[i-1], [x1, y1] = pts[i]; return y0 + (y1 - y0) * (v - x0) / (x1 - x0); }
+  }
+  return pts[pts.length - 1][1];
+}
+const NOW0 = new Date();
+const DAY = 864e5;
+const pad2 = n => String(n).padStart(2, '0');
+const fmtDate = d => `${d.getFullYear()}/${pad2(d.getMonth()+1)}/${pad2(d.getDate())}`;
+const fmtDT = d => `${pad2(d.getMonth()+1)}/${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+const isoDate = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+function ago(ts){
+  const s = (Date.now() - ts) / 1000;
+  if (s < 60) return '剛剛';
+  if (s < 3600) return `${Math.floor(s/60)} 分鐘前`;
+  if (s < 86400) return `${Math.floor(s/3600)} 小時前`;
+  return `${Math.floor(s/86400)} 天前`;
+}
+const startOfDay = d => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
+
+/* ============================================================
+   Domain model — EPB-1001 dual-module NMC pack on HID-2340
+   ============================================================ */
+const RATED_AH = 6.46;      // measured full capacity in the POC
+const SITES = [
+  {id:'A', name:'北區醫學中心', short:'北區', amb:26, n:16, wards:['急診部','加護病房 ICU','手術室','7F 內科病房','門診護理站']},
+  {id:'B', name:'中區教學醫院', short:'中區', amb:27, n:14, wards:['急診部','10F 外科病房','血液透析室','產房','藥劑部']},
+  {id:'C', name:'南區區域醫院', short:'南區', amb:28, n:10, wards:['急診部','加護病房 ICU','5F 綜合病房','復健科']},
+];
+const SITE = Object.fromEntries(SITES.map(s => [s.id, s]));
+const IND = [
+  {k:'cap',     name:'容量衰退',     unit:'%',   w:.22, fmt:v=>f1(v)+'%',    desc:'FullChargeCapacity ÷ 額定容量（SOH）'},
+  {k:'ir',      name:'內阻代理值',   unit:'mΩ',  w:.18, fmt:v=>f0(v)+' mΩ',  desc:'靜置與負載電壓差 ÷ 負載電流'},
+  {k:'thermal', name:'熱行為',       unit:'°C',  w:.16, fmt:v=>f1(v)+' °C',  desc:'充放電峰值溫度'},
+  {k:'soc',     name:'SOC 一致性',   unit:'pt',  w:.10, fmt:v=>(v>=0?'+':'')+f1(v)+' pt', desc:'BMS SOC 對比獨立庫倫計數'},
+  {k:'cv',      name:'充電終止曲線', unit:'min', w:.12, fmt:v=>'CV '+f0(v)+' 分', desc:'CC→CV 收斂時間（正常 35–38 分）'},
+  {k:'sym',     name:'雙模組對稱性', unit:'%',   w:.10, fmt:v=>f1(v)+'%',    desc:'B1／B2 電流分配差異'},
+  {k:'ce',      name:'庫倫效率',     unit:'%',   w:.12, fmt:v=>f1(v)+'%',    desc:'放電 Ah ÷ 充電 Ah'},
+];
+const INDK = Object.fromEntries(IND.map(i => [i.k, i]));
+const SUB = {
+  cap:     v => lerpMap(v, [[75,5],[80,40],[90,80],[97,100]]),
+  ir:      v => lerpMap(v, [[135,100],[160,60],[190,30],[220,5]]),
+  thermal: v => lerpMap(v, [[38,100],[42,65],[45,35],[48,5]]),
+  soc:     v => lerpMap(Math.abs(v), [[3,100],[8,65],[14,40],[20,15]]),
+  cv:      v => lerpMap(v, [[10,25],[15,45],[25,75],[30,100]]),
+  sym:     v => lerpMap(v, [[1,100],[4,60],[8,35],[12,10]]),
+  ce:      v => lerpMap(v, [[96,15],[97.5,45],[98.5,70],[99.2,100]]),
+};
+const ST = { good:{label:'良好', rank:2}, warn:{label:'需注意', rank:1}, crit:{label:'建議更換', rank:0} };
+const STATE = { chg:'充電中', dis:'放電中', idle:'靜置', off:'離線' };
+const ICON = {
+  chg:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2L4 14h6l-1 8 9-12h-6z"/></svg>',
+  dis:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v14M6 12l6 6 6-6"/></svg>',
+  idle:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg>',
+  off:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M8.5 16.5a5 5 0 0 1 7 0M5 12.9a10 10 0 0 1 5.2-2.8M19 12.9a10 10 0 0 0-2.4-1.7M2 8.8a15 15 0 0 1 4.2-2.7M22 8.8a15 15 0 0 0-11-3.7M12 20h.01"/></svg>',
+};
+const ACTIONS = {
+  cap:     {sig:'容量衰退',     act:'排程更換電池模組；更換前避免用於長時間行動任務',          due:'立即'},
+  ir:      {sig:'內阻上升',     act:'安排內阻複測與熱插拔接點檢查，列入下次維護週期優先觀察', due:'7 天內'},
+  thermal: {sig:'溫度異常',     act:'檢查充電器與機殼通風，暫停於高溫環境充電',                due:'48 小時內'},
+  soc:     {sig:'電量計飄移',   act:'電池本體良好；執行完整充放電並靜置 2 小時以上，讓電量計重新學習 FCC', due:'下次充電週期'},
+  cv:      {sig:'充電終止異常', act:'檢查充電器 CV 參數與連接器，複測一次完整充電',            due:'7 天內'},
+  sym:     {sig:'雙模組失衡',   act:'檢查熱插拔接點與 B1／B2 配對，必要時成對更換',            due:'48 小時內'},
+  ce:      {sig:'庫倫效率偏低', act:'疑似自放電或副反應，安排檢測並追蹤 3 個循環',             due:'7 天內'},
+  comm:    {sig:'通訊中斷',     act:'檢查裝置電源、USB／SMBus 連線與院內網路閘道',             due:'24 小時內'},
+};
+const statusOf = s => s >= 60 ? 'good' : s >= 40 ? 'warn' : 'crit';
+const bandCls = s => s >= 60 ? 'b-good' : s >= 50 ? 'b-mid' : s >= 40 ? 'b-warn' : 'b-crit';
+const scoreColor = s => s >= 60 ? 'var(--good)' : s >= 40 ? 'var(--warn)' : 'var(--crit)';
+const ocv = soc => lerpMap(soc, [[0,12.6],[5,13.2],[10,13.6],[20,14.1],[40,14.6],[60,15.1],[80,15.8],[100,16.6]]);
+
+/* Injected findings: real POC behaviours (B1 gauge drift, CV cut-off, etc.) spread across the mock fleet. since = days ago the module entered its current status. */
+const OVR = {
+  'C007-B2': {cap:77.8, ir:181, ce:98.9, devCycles:612, since:9},
+  'A011-B1': {thermal:47.2, ir:149, since:2},
+  'B004-B2': {sym:12.4, ir:214, symCulprit:true, since:4},
+  'C002-B1': {cap:79.4, ce:97.4, ir:176, devCycles:571, since:15},
+  'A003-B1': {soc:14.2, gaugeFrozen:true, since:12},
+  'A014-B1': {soc:12.0, since:6},
+  'B009-B1': {soc:13.1, since:20},
+  'B012-B2': {cv:13, since:5},
+  'A006-B2': {ir:172, since:8},
+  'C009-B1': {thermal:44.0, since:3},
+  'B001-B1': {cap:82.1, ir:152, devCycles:552, since:31},
+  'A015-B2': {sym:5.8, since:11},
+  'C005-B2': {ce:97.6, since:7},
+  'B007-B1': {cv:16, ir:156, since:14},
+  'A009-B2': {thermal:43.8, since:1},
+  'C010-B1': {cap:81.8, ir:158, devCycles:530, since:26},
+};
+const OFFLINE = { 'B013': 3.2, 'C004': 27.4 };   // device → hours since last report
+
+const DEVICES = [], MODULES = [], MOD = {};
+SITES.forEach(s => {
+  for (let i = 1; i <= s.n; i++){
+    const id = s.id + String(i).padStart(3, '0');
+    const dev = {id, site:s.id, ward:s.wards[(i - 1) % s.wards.length], cycles:randi(40, 470), installed:randi(4, 26), symDiff:rand(0.1, 0.9), offH:OFFLINE[id] || 0, mods:[]};
+    const o1 = OVR[id + '-B1'] || {}, o2 = OVR[id + '-B2'] || {};
+    if (o1.devCycles || o2.devCycles) dev.cycles = o1.devCycles || o2.devCycles;
+    if (o1.sym || o2.sym) dev.symDiff = o1.sym || o2.sym;
+    DEVICES.push(dev);
+    ['B1','B2'].forEach(slot => {
+      const mid = `${id}-${slot}`, o = OVR[mid] || {};
+      const cycles = dev.cycles + randi(-2, 2);
+      const raw = {
+        cap: clamp(100 - cycles * 0.029 - rand(0, 1.6), 70, 100),
+        ir: 122 + cycles * 0.045 + rand(0, 9),
+        thermal: rand(33.5, 38.4),
+        soc: rand(-2.8, 2.8),
+        cv: rand(34, 39),
+        sym: dev.symDiff,
+        ce: rand(99.2, 99.7),
+      };
+      ['cap','ir','thermal','soc','cv','ce'].forEach(k => { if (o[k] != null) raw[k] = o[k]; });
+      const m = {id:mid, dev, slot, site:s.id, ward:dev.ward, serial:'EPB1001-' + (2405000 + randi(100, 9800)), cycles, raw, o,
+        fcc: o.gaugeFrozen ? 5.99 : RATED_AH * raw.cap / 100 * rand(0.94, 0.97),
+        since: o.since ?? 0, preScore: rand(82, 93),
+        live:{soc:0, v:0, i:0, t:0, state:'idle'}, hist:{v:[], i:[], t:[], soc:[], bms:[]}};
+      MODULES.push(m); MOD[mid] = m; dev.mods.push(m);
+    });
+  }
+});
+// partner of an imbalance culprit inherits a pairing note
+function evaluate(m){
+  const subs = {}; IND.forEach(i => subs[i.k] = clamp(SUB[i.k](m.raw[i.k]), 0, 100));
+  const score = IND.reduce((a, i) => a + i.w * subs[i.k], 0);
+  const vetoes = [];
+  if (m.raw.cap < 80) vetoes.push('SOH 低於 80%');
+  if (m.raw.thermal > 45) vetoes.push('峰值溫度 > 45 °C');
+  if (m.raw.sym > 10 && m.o.symCulprit) vetoes.push('模組間顯著失衡');
+  if (m.dev.offH > 24) vetoes.push('通訊中斷 > 24 小時');
+  const minK = IND.reduce((a, i) => subs[i.k] < subs[a] ? i.k : a, 'cap');
+  let status = statusOf(score);
+  if (status === 'good' && subs[minK] < 50) status = 'warn';
+  if (m.dev.offH > 0 && status === 'good') status = 'warn';
+  if (vetoes.length) status = 'crit';
+  let sigK = subs[minK] < 80 ? minK : null;
+  if (m.dev.offH > 0) sigK = 'comm';
+  if (m.raw.sym > 10 && !m.o.symCulprit && subs.sym < subs[minK] + 1) sigK = 'sym';
+  Object.assign(m, {subs, score, vetoes, status, sigK});
+  const a = sigK ? ACTIONS[sigK] : null;
+  m.action = a ? a.act : '各項指標在正常範圍，維持例行監控';
+  m.due = status === 'crit' ? '立即' : status === 'warn' && a ? (sigK === 'cap' ? '30 天內' : a.due) : '—';
+  if (status === 'warn' && sigK === 'cap') m.action = `SOH ${f1(m.raw.cap)}% 接近 80% 門檻，排入下次維護週期並備妥替換模組`;
+  if (m.raw.sym > 10 && !m.o.symCulprit){ m.action = `配對模組 ${m.dev.id}-B2 內阻偏高造成電流失衡，與其一併檢查接點`; }
+  if (m.o.gaugeFrozen) m.action = '電池本體良好；電量計 FCC 自 13 循環起凍結於 5.99 Ah，需完整放電＋靜置校準，並請原廠確認 data flash';
+  if (status === 'good') m.since = 0;
+}
+MODULES.forEach(evaluate);
+MODULES.forEach(m => { if (m.status !== 'good' && !m.since) m.since = m.dev.offH > 24 ? 1 : 0; });
+const sigText = m => {
+  if (!m.sigK) return '—';
+  if (m.sigK === 'comm') return `通訊中斷 ${f1(m.dev.offH)} 小時`;
+  return `${ACTIONS[m.sigK].sig}（${INDK[m.sigK].fmt(m.raw[m.sigK])}）`;
+};
+// SOH trend per module over the last 12 cycles
+MODULES.forEach(m => {
+  const slope = m.raw.cap < 82 ? rand(0.12, 0.18) : rand(0.03, 0.07);
+  m.sohTrend = Array.from({length:12}, (_, k) => ({c:m.cycles - (11 - k), v:m.raw.cap + (11 - k) * slope + rand(-0.12, 0.12)}));
+  m.sohTrend[11].v = m.raw.cap;
+  const irSlope = m.raw.ir > 160 ? rand(1.4, 2.4) : rand(-0.1, 0.25);
+  m.irTrend = Array.from({length:12}, (_, k) => ({c:m.cycles - (11 - k), v:m.raw.ir - (11 - k) * irSlope + rand(-1.5, 1.5)}));
+  m.irTrend[11].v = m.raw.ir;
+});
+
+/* ---------- live telemetry simulation ---------- */
+DEVICES.forEach(d => {
+  const r = R();
+  d.state = d.offH ? 'off' : r < .55 ? 'dis' : r < .8 ? 'chg' : 'idle';
+  const soc = d.state === 'dis' ? rand(22, 95) : d.state === 'chg' ? rand(15, 85) : d.state === 'idle' ? rand(98, 100) : rand(30, 70);
+  d.lastSeen = Date.now() - d.offH * 3600e3;
+  d.mods.forEach(m => { m.live.soc = clamp(soc + rand(-1.5, 1.5), 1, 100); m.live.t = SITE[d.site].amb + rand(1, 4); });
+});
+const EVENTS = [];
+let evSorted = false;
+function pushEv(ts, mid, sev, type, msg){ const e = {ts, mid, sev, type, msg}; if (evSorted) EVENTS.unshift(e); else EVENTS.push(e); }
+function stepDevice(d, record){
+  if (d.state === 'off') { d.mods.forEach(m => { m.live.i = 0; }); return; }
+  const prev = d.state;
+  const share = [1 + d.symDiff / 200, 1 - d.symDiff / 200];
+  d.mods.forEach((m, idx) => {
+    const L = m.live, Rint = m.raw.ir / 1000;
+    if (d.state === 'dis'){
+      L.i = -(0.65 + (1 - L.soc / 100) * 0.17) * share[idx] * rand(.98, 1.02);
+      L.soc -= 0.09 * rand(.85, 1.15);
+    } else if (d.state === 'chg'){
+      L.i = L.soc < 88 ? 1.55 * share[idx] : Math.max(0.08, 1.55 * (100 - L.soc) / 12);
+      L.soc += L.soc < 88 ? 0.14 : 0.05 + (L.i / 1.55) * 0.08;
+    } else { L.i = rand(-0.01, 0.01); }
+    L.soc = clamp(L.soc, 0.5, 100);
+    L.v = d.state === 'chg' ? Math.min(16.8, ocv(L.soc) + L.i * Rint) : ocv(L.soc) + L.i * Rint;
+    const heat = (d.state === 'chg' ? 6 : d.state === 'dis' ? 2.5 : 0.6) + Math.max(0, m.raw.thermal - 38) * 0.9;
+    L.t += (SITE[d.site].amb + heat - L.t) * 0.06 + rand(-0.05, 0.05);
+    L.bms = clamp(L.soc + m.raw.soc * (1 - L.soc / 100) * 1.1, 0, 100);
+    if (record){
+      const H = m.hist; H.v.push(L.v); H.i.push(L.i); H.t.push(L.t); H.soc.push(L.soc); H.bms.push(L.bms);
+      if (H.v.length > 90) Object.values(H).forEach(a => a.shift());
+    }
+  });
+  const s0 = d.mods[0].live.soc;
+  if (d.state === 'dis' && s0 <= 14) d.state = 'chg';
+  else if (d.state === 'chg' && s0 >= 99.6) { d.state = 'idle'; d.mods.forEach(m => m.live.soc = 100); }
+  else if (d.state === 'idle' && R() < 0.004) d.state = 'dis';
+  d.lastSeen = Date.now();
+  if (record && prev !== d.state && simReady){
+    const mid = d.mods[0].id;
+    if (d.state === 'idle') pushEv(Date.now(), mid, 'info', 'chg', `${d.id} 充電完成（SOC 100%），轉為靜置`);
+    if (d.state === 'chg' && prev === 'dis') pushEv(Date.now(), mid, 'info', 'chg', `${d.id} 低電量（SOC ${f0(s0)}%），已接上充電座`);
+    if (d.state === 'dis' && prev === 'idle') pushEv(Date.now(), mid, 'info', 'dis', `${d.id} 離開充電座，切換電池供電`);
+    liveEventFlag = true;
+  }
+}
+let simReady = false, liveEventFlag = false;
+for (let k = 0; k < 90; k++) DEVICES.forEach(d => stepDevice(d, true));
+DEVICES.forEach(d => d.mods.forEach(m => { if (d.state === 'off') { const H = m.hist; ['v','i','t','soc','bms'].forEach(key => { if (!H[key].length) H[key] = Array(90).fill(key === 'i' ? 0 : key === 't' ? m.live.t : key === 'v' ? ocv(m.live.soc) : m.live.soc); }); m.live.v = ocv(m.live.soc); m.live.bms = m.live.soc; } }));
+simReady = true;
+
+/* ---------- history: events, fleet trend, work orders ---------- */
+const HDAYS = 180;
+const now = NOW0.getTime();
+MODULES.filter(m => m.status !== 'good').forEach(m => {
+  const t0 = m.sigK === 'comm' ? now - m.dev.offH * 3600e3 : now - m.since * DAY - randi(20, 300) * 60e3;
+  const sk = m.sigK || 'cap';
+  const what = m.sigK === 'comm' ? `裝置 ${m.dev.id} 停止回報資料` : sigText(m);
+  pushEv(Math.min(t0, now - 5 * 60e3), m.id, m.status, sk, `判定變更為「${ST[m.status].label}」：${what}`);
+  for (let d = m.since - randi(2, 4); d > 0; d -= randi(2, 4)) pushEv(now - d * DAY - randi(30, 600) * 60e3, m.id, 'warn', sk, `持續觀察：${what}`);
+});
+['A005-B1','B010-B2','C006-B1','A012-B2','B003-B1','A008-B1','C003-B2','B011-B1','A001-B2','A013-B1','B006-B2','C008-B1'].forEach((mid, k) => {
+  const d0 = randi(18, 170), dur = randi(2, 5);
+  if (k % 3 === 0){ pushEv(now - d0 * DAY, mid, 'warn', 'thermal', `充電峰溫 ${f1(rand(42.2, 43.9))} °C（充電器環境溫度偏高）`); pushEv(now - (d0 - dur) * DAY, mid, 'info', 'thermal', '改善通風後峰溫回到 38 °C 以下'); }
+  else { pushEv(now - d0 * DAY, mid, 'warn', 'soc', `電量計飄移 +${f1(rand(8.5, 11))} pt`); pushEv(now - (d0 - dur) * DAY, mid, 'info', 'soc', '完成完整放電＋靜置校準，SOC 誤差恢復 < 3 pt'); }
+});
+for (let d = HDAYS; d >= 1; d--){
+  const n = randi(0, 2);
+  for (let k = 0; k < n; k++){
+    const m = MODULES[randi(0, MODULES.length - 1)];
+    const opts = [['info','fcc','FCC 學習值已更新'],['info','chg','完成完整充放電循環'],['info','comm','短暫斷線後已恢復連線'],['warn','thermal',`溫度短暫上升 +${f1(rand(2, 3.4))} °C，已回穩`]];
+    const [sev, type, msg] = opts[randi(0, opts.length - 1)];
+    pushEv(now - d * DAY + randi(-600, 600) * 60e3, m.id, sev, type, `${m.dev.id}：${msg}`);
+  }
+}
+EVENTS.sort((a, b) => b.ts - a.ts); evSorted = true;
+
+function statusAt(m, daysAgo){ return (m.status === 'good' || daysAgo > m.since) ? 'good' : m.status; }
+function scoreAt(m, daysAgo){ if (m.status !== 'good' && daysAgo > m.since) return Math.min(100, m.preScore + daysAgo * 0.006); return Math.min(100, m.score + (m.status === 'good' ? daysAgo * 0.009 : 0)); }
+const NOISE = Array.from({length:HDAYS + 1}, () => rand(-0.25, 0.25));
+function fleetDay(daysAgo, mods){
+  if (!mods.length) return {avg:0, good:0, warn:0, crit:0};
+  let s = 0, c = {good:0, warn:0, crit:0};
+  mods.forEach(m => { s += scoreAt(m, daysAgo); c[statusAt(m, daysAgo)]++; });
+  return {avg: s / mods.length + (daysAgo ? NOISE[daysAgo] : 0), ...c};
+}
+
+const WOS = [
+  {id:'WO-2611-014', mid:'C007-B2', created:now - 1.2 * DAY, status:'待派工', who:'—', act:'更換電池模組（SOH 77.8%）'},
+  {id:'WO-2611-012', mid:'A011-B1', created:now - 1.7 * DAY, status:'處理中', who:'林工程師', act:'檢查手術室充電座通風；峰溫 47.2 °C'},
+  {id:'WO-2610-031', mid:'B010-B2', created:now - 24 * DAY, done:now - 22 * DAY, status:'已完成', who:'陳工程師', act:'電量計完整校準'},
+  {id:'WO-2610-022', mid:'A002-B1', created:now - 41 * DAY, done:now - 38 * DAY, status:'已完成', who:'林工程師', act:'更換電池模組'},
+  {id:'WO-2609-017', mid:'C006-B1', created:now - 63 * DAY, done:now - 60 * DAY, status:'已完成', who:'王工程師', act:'熱插拔接點清潔'},
+  {id:'WO-2608-009', mid:'B003-B1', created:now - 96 * DAY, done:now - 94 * DAY, status:'已完成', who:'陳工程師', act:'充電器 CV 參數修正'},
+  {id:'WO-2607-004', mid:'A012-B2', created:now - 128 * DAY, done:now - 125 * DAY, status:'已完成', who:'王工程師', act:'更換電池模組'},
+];
+let woSeq = 15;
+function createWO(mid, note){
+  const m = MOD[mid]; if (!m) return null;
+  const ex = WOS.find(w => w.mid === mid && w.status !== '已完成'); if (ex) return ex;
+  const w = {id:`WO-2611-0${woSeq++}`, mid, created:Date.now(), status:'待派工', who:'—', act:note || m.action};
+  WOS.unshift(w);
+  pushEv(Date.now(), mid, 'info', 'wo', `已建立維護工單 ${w.id}`); liveEventFlag = true;
+  updateBadge();
+  return w;
+}
+const openWO = mid => WOS.find(w => w.mid === mid && w.status !== '已完成');
+
+/* ============================================================
+   App state
+   ============================================================ */
+const S = { route:'overview', site:'all', drawer:null,
+  list:{q:'', status:'all', state:'all', sig:'all', sort:'status', dir:1, page:1},
+  maint:{tab:'all'},
+  rep:{type:'fleet', preset:'30', start:null, end:null, site:'all', mid:'A003-B1', secs:{summary:true, trend:true, status:true, issues:true, queue:true, wo:true, alerts:true, method:true}},
+  reports:[], chat:[], aiBusy:false };
+const scoped = () => S.site === 'all' ? MODULES : MODULES.filter(m => m.site === S.site);
+const scopedDev = () => S.site === 'all' ? DEVICES : DEVICES.filter(d => d.site === S.site);
+const byPriority = (a, b) => ST[a.status].rank - ST[b.status].rank || a.score - b.score;
+const counts = mods => mods.reduce((c, m) => (c[m.status]++, c), {good:0, warn:0, crit:0});
+
+/* ============================================================
+   Tooltip + chart helpers
+   ============================================================ */
+const tip = $('#tip');
+function showTip(html, x, y){
+  tip.innerHTML = html; tip.classList.add('on');
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  let lx = x + 14, ly = y + 14;
+  if (lx + w > innerWidth - 8) lx = x - w - 14;
+  if (ly + h > innerHeight - 8) ly = y - h - 14;
+  tip.style.left = Math.max(8, lx) + 'px'; tip.style.top = Math.max(8, ly) + 'px';
+}
+const hideTip = () => tip.classList.remove('on');
+document.addEventListener('mouseover', e => { const t = e.target.closest('[data-tip]'); if (t) showTip(t.dataset.tip, e.clientX, e.clientY); });
+document.addEventListener('mousemove', e => { const t = e.target.closest('[data-tip]'); if (t) showTip(t.dataset.tip, e.clientX, e.clientY); });
+document.addEventListener('mouseout', e => { const t = e.target.closest('[data-tip]'); if (t && !t.contains(e.relatedTarget)) hideTip(); });
+
+/* Line chart: one y-scale, faint grid, area under the first series, emphasized endpoint, crosshair + tooltip. */
+function lineChart(el, o){
+  const W = Math.max(260, Math.floor(el.clientWidth || 600)), H = o.h || 220;
+  const m = {l:o.ml ?? 38, r:o.mr ?? 12, t:14, b:24};
+  const iw = W - m.l - m.r, ih = H - m.t - m.b, n = o.labels.length;
+  const ink3 = o.ink || 'var(--ink-3)', grid = o.grid || 'var(--line)', surf = o.surf || 'var(--surface)';
+  const X = i => m.l + (n <= 1 ? iw / 2 : i * iw / (n - 1));
+  const Y = v => m.t + ih - (v - o.yMin) / (o.yMax - o.yMin) * ih;
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" role="img" aria-label="${esc(o.aria || '')}">`;
+  (o.yTicks || []).forEach(v => { s += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(v)}" y2="${Y(v)}" style="stroke:${grid};stroke-width:1"/><text x="${m.l - 6}" y="${Y(v) + 3.5}" text-anchor="end" style="fill:${ink3}">${o.yFmt ? o.yFmt(v) : v}</text>`; });
+  const xt = o.xTicks || [0, Math.round((n - 1) / 3), Math.round(2 * (n - 1) / 3), n - 1];
+  [...new Set(xt)].forEach(i => { const anc = i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'; s += `<text x="${X(i)}" y="${H - 6}" text-anchor="${anc}" style="fill:${ink3}">${esc(o.xFmt ? o.xFmt(o.labels[i], i) : o.labels[i])}</text>`; });
+  (o.thresholds || []).forEach(t => { s += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(t.y)}" y2="${Y(t.y)}" style="stroke:${t.color};stroke-width:1.5;stroke-dasharray:5 4"/><text x="${W - m.r}" y="${Y(t.y) - 5}" text-anchor="end" style="fill:${t.color};font-weight:600">${esc(t.label)}</text>`; });
+  o.series.forEach((se, si) => {
+    const pts = se.values.map((v, i) => [X(i), Y(v)]);
+    const d = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join('');
+    if (si === 0 && o.area !== false) s += `<path d="${d}L${X(n - 1)} ${m.t + ih}L${X(0)} ${m.t + ih}Z" style="fill:${se.color};opacity:.10"/>`;
+    s += `<path d="${d}" style="fill:none;stroke:${se.color};stroke-width:2;stroke-linejoin:round;stroke-linecap:round"/>`;
+    const lp = pts[pts.length - 1];
+    if (lp) s += `<circle cx="${lp[0]}" cy="${lp[1]}" r="4" style="fill:${se.color};stroke:${surf};stroke-width:2"/>`;
+  });
+  s += `<g class="xh" style="display:none"><line y1="${m.t}" y2="${m.t + ih}" style="stroke:${ink3};stroke-width:1"/>${o.series.map(se => `<circle r="4.5" style="fill:${se.color};stroke:${surf};stroke-width:2"/>`).join('')}</g>`;
+  s += `<rect x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" style="fill:transparent"/></svg>`;
+  let lg = '';
+  if (o.series.length > 1 || o.legend) lg = `<div class="legend" style="margin-bottom:6px">${o.series.map(se => `<span><i class="sw" style="background:${se.color}"></i>${esc(se.name)}</span>`).join('')}${(o.thresholds || []).map(t => `<span><i class="sw" style="background:none;border-top:2px dashed ${t.color};height:0;border-radius:0"></i>${esc(t.label)}</span>`).join('')}</div>`;
+  el.innerHTML = lg + `<div class="chart">${s}</div>`;
+  const svg = el.querySelector('svg'), xh = svg.querySelector('.xh');
+  svg.addEventListener('mousemove', e => {
+    const r = svg.getBoundingClientRect(), px = (e.clientX - r.left) * W / r.width;
+    const i = clamp(Math.round((px - m.l) / iw * (n - 1)), 0, n - 1);
+    xh.style.display = ''; xh.querySelector('line').setAttribute('x1', X(i)); xh.querySelector('line').setAttribute('x2', X(i));
+    xh.querySelectorAll('circle').forEach((c, si) => { c.setAttribute('cx', X(i)); c.setAttribute('cy', Y(o.series[si].values[i])); });
+    showTip(`<b>${esc(o.tipTitle ? o.tipTitle(i) : o.labels[i])}</b>` + o.series.map(se => `<div class="tr"><i style="background:${se.color}"></i>${esc(se.name)}：${o.tipFmt ? o.tipFmt(se.values[i]) : se.values[i]}</div>`).join(''), e.clientX, e.clientY);
+  });
+  svg.addEventListener('mouseleave', () => { xh.style.display = 'none'; hideTip(); });
+}
+function spark(vals, color, w = 120, h = 30){
+  if (!vals.length) return '';
+  let mn = Math.min(...vals), mx = Math.max(...vals); if (mx - mn < 1e-6){ mx += .5; mn -= .5; }
+  const pts = vals.map((v, i) => [(i / (vals.length - 1)) * w, h - 3 - (v - mn) / (mx - mn) * (h - 6)]);
+  const d = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join('');
+  const lp = pts[pts.length - 1];
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" preserveAspectRatio="none" aria-hidden="true"><path d="${d}L${w} ${h}L0 ${h}Z" style="fill:${color};opacity:.12"/><path d="${d}" style="fill:none;stroke:${color};stroke-width:1.6" vector-effect="non-scaling-stroke"/><circle cx="${lp[0]}" cy="${lp[1]}" r="2.5" style="fill:${color}"/></svg>`;
+}
+const pill = st => `<span class="pill ${st}">${ST[st].label}</span>`;
+const stIc = st => `<span class="st-ic ${st}">${ICON[st]}${STATE[st]}</span>`;
+const scoreBar = m => `<div class="scorebar"><div class="trk"><i style="width:${clamp(m.score,2,100)}%;background:${scoreColor(m.status === 'crit' ? 0 : m.status === 'warn' ? 50 : 100)}"></i></div><b>${f0(m.score)}</b></div>`;
+const mLoc = m => `${SITE[m.site].short}・${m.ward}`;
+
+/* ============================================================
+   Page: Overview
+   ============================================================ */
+function renderOverview(){
+  const v = $('#v-overview'), mods = scoped(), c = counts(mods), devs = scopedDev();
+  const online = mods.filter(m => m.dev.offH === 0).length;
+  const avg = mods.reduce((a, m) => a + m.score, 0) / mods.length;
+  const d30 = fleetDay(30, mods).avg;
+  const openW = WOS.filter(w => w.status !== '已完成' && mods.includes(MOD[w.mid])).length;
+  const top = mods.filter(m => m.status !== 'good').sort(byPriority).slice(0, 6);
+  v.innerHTML = `
+  <div class="grid g-kpi">
+    <div class="card kpi k-acc"><span class="lbl">監控中電池模組</span><span class="val">${mods.length}</span><span class="foot">${devs.length} 台 HID-2340 ・線上 <b class="num" data-live="online">${online}</b></span></div>
+    <div class="card kpi k-acc"><span class="lbl">平均健康分數</span><span class="val">${f1(avg)}<small>/ 100</small></span><span class="foot">較 30 天前 <span class="${avg - d30 < 0 ? 'delta-down' : 'delta-up'}">${avg - d30 < 0 ? '▼' : '▲'} ${f1(Math.abs(avg - d30))}</span></span></div>
+    <div class="card kpi k-crit"><span class="lbl">建議更換</span><span class="val">${c.crit}</span><span class="foot">含硬性否決項觸發</span><button class="kpi-link" data-go="maintenance" data-tab="crit" aria-label="查看建議更換清單"></button></div>
+    <div class="card kpi k-warn"><span class="lbl">需注意</span><span class="val">${c.warn}</span><span class="foot">排入下次維護週期</span><button class="kpi-link" data-go="maintenance" data-tab="warn" aria-label="查看需注意清單"></button></div>
+    <div class="card kpi k-good"><span class="lbl">良好</span><span class="val">${c.good}</span><span class="foot">待處理工單 ${openW} 張</span><button class="kpi-link" data-go="batteries" data-status="good" aria-label="查看良好模組"></button></div>
+  </div>
+  <div class="grid g-2">
+    <div class="card">
+      <header><h2>本週優先風險</h2><span class="hint">依判定與綜合健康分數排序</span><div class="r"><button class="btn sm" data-go="maintenance">前往維護</button></div></header>
+      <ul class="risk">${top.map((m, i) => `<li>
+        <span class="rk">${i + 1}</span>
+        <div class="t"><b><button class="lnk mono" data-open="${m.id}">${m.id}</button>${pill(m.status)}${m.vetoes.map(x => `<span class="chip veto">${esc(x)}</span>`).join('')}</b><span>${esc(mLoc(m))}・${esc(sigText(m))}</span></div>
+        <span class="sub2">${esc(m.due)}</span></li>`).join('') || '<li><span></span><div class="t"><b>目前沒有需處理的模組</b></div></li>'}</ul>
+    </div>
+    <div class="card">
+      <header><h2>健康狀態分布</h2><span class="hint">${mods.length} 個模組</span></header>
+      <div class="dist" role="img" aria-label="良好 ${c.good}、需注意 ${c.warn}、建議更換 ${c.crit}">
+        <div class="d-good" style="flex:${c.good}" data-tip="<b>良好</b> ${c.good} 個（${f0(c.good / mods.length * 100)}%）">${c.good}</div>
+        <div class="d-warn" style="flex:${c.warn}" data-tip="<b>需注意</b> ${c.warn} 個（${f0(c.warn / mods.length * 100)}%）">${c.warn || ''}</div>
+        <div class="d-crit" style="flex:${c.crit}" data-tip="<b>建議更換</b> ${c.crit} 個（${f0(c.crit / mods.length * 100)}%）">${c.crit || ''}</div>
+      </div>
+      <div class="legend" style="margin-top:8px"><span><i class="sw" style="background:var(--good);border-radius:50%"></i>良好 ≥ 60</span><span><i class="sw" style="background:var(--warn)"></i>需注意 40–59</span><span><i class="sw" style="background:var(--crit)"></i>建議更換 &lt; 40 或否決項</span></div>
+      ${S.site === 'all' ? `<div class="sect-lbl">各院區</div><div class="site-rows">${SITES.map(s => { const sm = MODULES.filter(m => m.site === s.id), sc = counts(sm); return `<div class="site-row"><span>${s.name}</span><div class="dist"><div class="d-good" style="flex:${sc.good}" data-tip="<b>${s.name}</b><br>良好 ${sc.good}"></div><div class="d-warn" style="flex:${sc.warn}" data-tip="<b>${s.name}</b><br>需注意 ${sc.warn}"></div><div class="d-crit" style="flex:${sc.crit}" data-tip="<b>${s.name}</b><br>建議更換 ${sc.crit}"></div></div><span class="sub2 num">${sc.warn + sc.crit} 項</span></div>`; }).join('')}</div>` : ''}
+      <div class="sect-lbl">即時運作狀態（裝置）</div>
+      <div class="ops">${['dis','chg','idle','off'].map(k => `<div><span>${stIc(k)}</span><b data-live="ops-${k}">0</b></div>`).join('')}</div>
+    </div>
+  </div>
+  <div class="card">
+    <header><h2>電池即時狀態牆</h2><span class="hint">每個方塊為一個模組，數字為 BMS 回報 SOC；點選查看詳細資訊</span>
+      <div class="r legend"><span>${stIc('chg')}</span><span>${stIc('dis')}</span><span>${stIc('idle')}</span><span>${stIc('off')}</span></div></header>
+    ${SITES.filter(s => S.site === 'all' || s.id === S.site).map(s => `<div class="wall-site"><h3>${s.name}<span>${s.n} 台裝置</span></h3><div class="wall">${DEVICES.filter(d => d.site === s.id).map(d => `
+      <div class="dev"><div class="dh"><b>${d.id}</b><span>${esc(d.ward)}</span></div><div class="mods">${d.mods.map(m => `
+        <button class="mod ${m.status}${d.offH ? ' offl' : ''}" data-open="${m.id}" aria-label="${m.id} ${ST[m.status].label}">
+          <span class="mt"><span>${m.slot}</span><span class="shape" aria-hidden="true"></span></span>
+          <span class="soc" data-live="soc" data-mid="${m.id}">—</span>
+          <span class="bar"><i data-live="socbar" data-mid="${m.id}"></i></span>
+          <span class="mb"><span data-live="stateic" data-compact="1" data-mid="${m.id}"></span><span data-live="t" data-compact="1" data-mid="${m.id}"></span></span>
+        </button>`).join('')}</div></div>`).join('')}</div></div>`).join('')}
+  </div>
+  <div class="grid g-2">
+    <div class="card"><header><h2>機隊健康分數趨勢</h2><span class="hint">最近 90 天・每日平均</span></header><div id="ovTrend"></div></div>
+    <div class="card"><header><h2>即時警示</h2><span class="hint">最新事件</span><div class="r"><button class="btn sm" data-go="reports">完整紀錄</button></div></header><ul class="feed" id="ovFeed"></ul></div>
+  </div>`;
+  const days = Array.from({length:91}, (_, i) => 90 - i);
+  const vals = days.map(d => fleetDay(d, mods).avg);
+  const lo = Math.floor(Math.min(...vals) - 2), hi = Math.ceil(Math.max(...vals) + 1);
+  lineChart($('#ovTrend'), {labels:days.map(d => fmtDate(new Date(now - d * DAY)).slice(5)), series:[{name:'平均健康分數', values:vals, color:'var(--accent)'}], yMin:lo, yMax:hi, yTicks:[lo, Math.round((lo + hi) / 2), hi], h:230, tipFmt:f1, aria:'機隊健康分數 90 天趨勢', tipTitle:i => fmtDate(new Date(now - days[i] * DAY))});
+  renderFeed();
+  live();
+}
+function renderFeed(){
+  const el = $('#ovFeed'); if (!el) return;
+  const evs = EVENTS.filter(e => S.site === 'all' || MOD[e.mid]?.site === S.site).slice(0, 8);
+  el.innerHTML = evs.map((e, k) => `<li class="${k === 0 && e.ts > Date.now() - 4000 ? 'new' : ''}"><span class="sev ${e.sev}" aria-label="${e.sev === 'crit' ? '嚴重' : e.sev === 'warn' ? '警告' : '資訊'}">${e.sev === 'crit' ? '■' : e.sev === 'warn' ? '▲' : 'i'}</span><span><button class="lnk mono" data-open="${e.mid}">${e.mid}</button>　${esc(e.msg)}</span><span class="when">${ago(e.ts)}</span></li>`).join('');
+}
+
+/* ============================================================
+   Page: Maintenance
+   ============================================================ */
+function renderMaintenance(){
+  const v = $('#v-maintenance'), mods = scoped(), c = counts(mods);
+  const q = mods.filter(m => m.status !== 'good' && (S.maint.tab === 'all' || m.status === S.maint.tab)).sort(byPriority);
+  const open = WOS.filter(w => w.status !== '已完成' && mods.includes(MOD[w.mid]));
+  const done30 = WOS.filter(w => w.status === '已完成' && w.done > now - 30 * DAY && mods.includes(MOD[w.mid])).length;
+  const attn = mods.filter(m => m.status !== 'good').sort(byPriority);
+  v.innerHTML = `
+  <div class="grid g-4">
+    <div class="card kpi k-crit"><span class="lbl">立即處置</span><span class="val">${c.crit}</span><span class="foot">建議更換或否決項觸發</span></div>
+    <div class="card kpi k-warn"><span class="lbl">排入下次維護</span><span class="val">${c.warn}</span><span class="foot">單一指標異常或分數 40–59</span></div>
+    <div class="card kpi k-acc"><span class="lbl">進行中工單</span><span class="val">${open.length}</span><span class="foot">${open.filter(w => w.status === '待派工').length} 張待派工</span></div>
+    <div class="card kpi k-good"><span class="lbl">近 30 天完成</span><span class="val">${done30}</span><span class="foot">平均處理 2.3 天</span></div>
+  </div>
+  <div class="card">
+    <header><h2>維護優先順序</h2><span class="hint">觀察到的異常訊號 → 建議處置動作</span>
+      <div class="r"><div class="seg" role="group" aria-label="篩選判定">${[['all','全部'],['crit','建議更換'],['warn','需注意']].map(([k, l]) => `<button aria-pressed="${S.maint.tab === k}" data-mtab="${k}">${l}</button>`).join('')}</div></div></header>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>#</th><th>模組</th><th>位置</th><th>健康分數</th><th>判定</th><th>主要訊號／否決項</th><th>建議處置</th><th>時限</th><th></th></tr></thead>
+      <tbody>${q.map((m, i) => { const w = openWO(m.id); return `<tr class="clk" data-open="${m.id}">
+        <td class="sub2 num">${i + 1}</td><td class="idcell">${m.id}</td><td>${esc(mLoc(m))}</td><td>${scoreBar(m)}</td><td>${pill(m.status)}</td>
+        <td><div style="display:flex;flex-direction:column;gap:3px">${esc(sigText(m))}${m.vetoes.map(x => `<span class="chip veto" style="width:max-content">否決：${esc(x)}</span>`).join('')}</div></td>
+        <td style="max-width:320px">${esc(m.action)}</td><td style="white-space:nowrap"><b style="font-weight:600;color:${m.status === 'crit' ? 'var(--crit-ink)' : 'var(--ink)'}">${esc(m.due)}</b></td>
+        <td>${w ? `<span class="chip">${w.id}・${w.status}</span>` : `<button class="btn sm" data-wo="${m.id}">建立工單</button>`}</td></tr>`; }).join('') || '<tr><td colspan="9" class="sub2">此範圍內沒有需處理的模組</td></tr>'}</tbody>
+    </table></div>
+  </div>
+  <div class="grid g-2">
+    <div class="card"><header><h2>指標嚴重度矩陣</h2><span class="hint">需處理模組 × 七項診斷指標，數字為 0–100 健康子分數</span></header>
+      <div class="hm" style="grid-template-columns:auto repeat(7,minmax(46px,1fr))">
+        <span></span>${IND.map(i => `<span class="hh">${i.name}</span>`).join('')}
+        ${attn.map(m => `<span class="hr"><button data-open="${m.id}">${m.id}</button></span>${IND.map(i => `<span class="hc ${bandCls(m.subs[i.k])}" data-tip="<b>${m.id}・${i.name}</b><br>讀值 ${esc(i.fmt(m.raw[i.k]))}<br>子分數 ${f0(m.subs[i.k])} / 100">${f0(m.subs[i.k])}</span>`).join('')}`).join('')}
+      </div>
+      <div class="legend" style="margin-top:10px"><span><i class="sw b-good"></i>≥ 60</span><span><i class="sw b-mid"></i>50–59</span><span><i class="sw b-warn"></i>40–49</span><span><i class="sw b-crit"></i>&lt; 40</span></div>
+    </div>
+    <div class="card"><header><h2>健康分數分布</h2><span class="hint">全部 ${mods.length} 個模組・每 5 分一組</span></header><div id="mHist"></div>
+      <p class="sub2" style="margin:8px 0 0">觸發硬性否決項（SOH &lt; 80%、峰溫 &gt; 45 °C、模組間顯著失衡、通訊中斷 &gt; 24 小時）的模組，不論綜合分數一律判定為建議更換，不會被其他良好指標平均掉。</p></div>
+  </div>
+  <div class="card"><header><h2>維護工單</h2><span class="hint">由維護清單或 AI 助理建立</span></header>
+    <div class="tbl-wrap"><table><thead><tr><th>工單編號</th><th>模組</th><th>處置內容</th><th>負責人</th><th>建立時間</th><th>狀態</th></tr></thead>
+    <tbody>${WOS.filter(w => mods.includes(MOD[w.mid])).map(w => `<tr class="clk" data-open="${w.mid}"><td class="mono">${w.id}</td><td class="idcell">${w.mid}</td><td>${esc(w.act)}</td><td>${esc(w.who)}</td><td class="num sub2">${fmtDT(new Date(w.created))}</td><td><span class="chip" style="${w.status === '已完成' ? 'color:var(--good-ink)' : w.status === '處理中' ? 'color:var(--accent)' : ''}">${w.status}</span></td></tr>`).join('')}</tbody></table></div>
+  </div>`;
+  histogram($('#mHist'), mods);
+}
+function histogram(el, mods){
+  const bins = []; for (let b = 30; b < 100; b += 5) bins.push({lo:b, hi:b + 5, n:0});
+  mods.forEach(m => { const b = bins.find(x => m.score >= x.lo && m.score < x.hi) || (m.score >= 100 ? bins[bins.length - 1] : bins[0]); b.n++; });
+  const W = Math.max(260, el.clientWidth || 500), H = 200, ml = 30, mr = 8, mt = 12, mb = 24, iw = W - ml - mr, ih = H - mt - mb;
+  const mx = Math.max(...bins.map(b => b.n)), top = Math.ceil(mx / 5) * 5 || 5;
+  const bw = iw / bins.length;
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" role="img" aria-label="健康分數分布直方圖">`;
+  [0, top / 2, top].forEach(v => { const y = mt + ih - v / top * ih; s += `<line x1="${ml}" x2="${W - mr}" y1="${y}" y2="${y}" style="stroke:var(--line)"/><text x="${ml - 6}" y="${y + 3.5}" text-anchor="end">${v}</text>`; });
+  bins.forEach((b, i) => {
+    const h = b.n / top * ih, x = ml + i * bw + 1, y = mt + ih - h;
+    const col = b.lo >= 60 ? 'var(--good)' : b.lo >= 40 ? 'var(--warn)' : 'var(--crit)';
+    if (b.n) s += `<path d="M${x} ${mt + ih}V${y + 4}q0 -4 4 -4h${bw - 10}q4 0 4 4V${mt + ih}Z" style="fill:${col}" data-tip="<b>分數 ${b.lo}–${b.hi - 1}</b><br>${b.n} 個模組"/>`;
+    if (i % 2 === 0) s += `<text x="${ml + i * bw}" y="${H - 6}" text-anchor="middle">${b.lo}</text>`;
+  });
+  [40, 60].forEach(t => { const x = ml + (t - 30) / 5 * bw; s += `<line x1="${x}" x2="${x}" y1="${mt}" y2="${mt + ih}" style="stroke:var(--ink-2);stroke-dasharray:4 3"/><text x="${x + 4}" y="${mt + 8}" style="fill:var(--ink-2);font-weight:600">${t === 40 ? '建議更換 | 需注意' : '需注意 | 良好'}</text>`; });
+  el.innerHTML = `<div class="chart">${s}</svg></div>`;
+}
+
+/* ============================================================
+   Page: Battery list
+   ============================================================ */
+const COLS = [
+  ['id','模組'], ['loc','位置'], ['status','判定'], ['score','健康分數', 'r'], ['soh','SOH', 'r'], ['soc','SOC (BMS)'], ['v','電壓', 'r'], ['i','電流', 'r'], ['t','溫度', 'r'], ['cycles','循環數', 'r'], ['sig','主要訊號'], ['state','運作狀態'],
+];
+function listRows(){
+  const L = S.list, q = L.q.trim().toLowerCase();
+  let rows = scoped().filter(m => {
+    if (L.status !== 'all' && m.status !== L.status) return false;
+    const st = m.dev.state;
+    if (L.state !== 'all' && st !== L.state) return false;
+    if (L.sig !== 'all' && m.sigK !== L.sig) return false;
+    if (q && !(`${m.id} ${m.serial} ${m.ward} ${SITE[m.site].name} ${sigText(m)}`.toLowerCase().includes(q))) return false;
+    return true;
+  });
+  const key = {id:m => m.id, loc:m => m.site + m.ward, status:m => ST[m.status].rank * 1000 + m.score, score:m => m.score, soh:m => m.raw.cap, soc:m => m.live.bms, v:m => m.live.v, i:m => m.live.i, t:m => m.live.t, cycles:m => m.cycles, sig:m => m.sigK || 'zz', state:m => m.dev.state}[L.sort];
+  rows.sort((a, b) => { const x = key(a), y = key(b); return (x < y ? -1 : x > y ? 1 : 0) * L.dir; });
+  return rows;
+}
+function renderBatteries(){
+  const v = $('#v-batteries'), L = S.list;
+  if (!v.dataset.built){
+    v.innerHTML = `<div class="card">
+      <div class="toolbar">
+        <div class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input class="inp" id="lq" type="search" placeholder="搜尋模組 ID、序號、單位…" aria-label="搜尋"></div>
+        <select class="sel" id="lstatus" aria-label="判定"><option value="all">全部判定</option><option value="crit">建議更換</option><option value="warn">需注意</option><option value="good">良好</option></select>
+        <select class="sel" id="lstate" aria-label="運作狀態"><option value="all">全部運作狀態</option><option value="dis">放電中</option><option value="chg">充電中</option><option value="idle">靜置</option><option value="off">離線</option></select>
+        <select class="sel" id="lsig" aria-label="異常訊號"><option value="all">全部訊號</option>${Object.entries(ACTIONS).map(([k, a]) => `<option value="${k}">${a.sig}</option>`).join('')}</select>
+        <button class="btn ghost" id="lreset">重設</button>
+        <span class="count" id="lcount"></span>
+        <button class="btn" id="lcsv">匯出 CSV</button>
+      </div></div>
+      <div class="card"><div class="tbl-wrap"><table><thead><tr id="lhead"></tr></thead><tbody id="lbody"></tbody></table></div><div class="pager" id="lpager"></div></div>`;
+    v.dataset.built = '1';
+    $('#lq').addEventListener('input', e => { L.q = e.target.value; L.page = 1; renderBatteries(); });
+    ['status','state','sig'].forEach(k => $('#l' + k).addEventListener('change', e => { L[k] = e.target.value; L.page = 1; renderBatteries(); }));
+    $('#lreset').addEventListener('click', () => { Object.assign(L, {q:'', status:'all', state:'all', sig:'all', sort:'status', dir:1, page:1}); renderBatteries(); });
+    $('#lcsv').addEventListener('click', exportCSV);
+  }
+  $('#lq').value = L.q; $('#lstatus').value = L.status; $('#lstate').value = L.state; $('#lsig').value = L.sig;
+  const rows = listRows(), per = 20, pages = Math.max(1, Math.ceil(rows.length / per));
+  L.page = clamp(L.page, 1, pages);
+  $('#lcount').textContent = `${rows.length} / ${scoped().length} 個模組`;
+  $('#lhead').innerHTML = COLS.map(([k, l, a]) => `<th class="${a || ''}" ${L.sort === k ? `aria-sort="${L.dir > 0 ? 'ascending' : 'descending'}"` : ''}><button data-sort="${k}">${l}${L.sort === k ? (L.dir > 0 ? ' ↑' : ' ↓') : ''}</button></th>`).join('');
+  $('#lbody').innerHTML = rows.slice((L.page - 1) * per, L.page * per).map(m => `<tr class="clk" data-open="${m.id}">
+    <td class="idcell">${m.id}<div class="sub2" style="font-family:var(--font)">${m.serial}</div></td><td>${esc(SITE[m.site].short)}<div class="sub2">${esc(m.ward)}</div></td>
+    <td>${pill(m.status)}</td><td class="r num"><b style="font-weight:600">${f0(m.score)}</b></td><td class="r num">${f1(m.raw.cap)}%</td>
+    <td><div class="socbar"><span class="trk"><i data-live="socbar" data-mid="${m.id}"></i></span><span class="num" data-live="soc" data-mid="${m.id}"></span></div></td>
+    <td class="r num" data-live="v" data-mid="${m.id}"></td><td class="r num" data-live="i" data-mid="${m.id}"></td><td class="r num" data-live="t" data-mid="${m.id}"></td>
+    <td class="r num">${m.cycles}</td><td style="min-width:150px">${esc(sigText(m))}</td><td data-live="stateic" data-mid="${m.id}"></td></tr>`).join('') || `<tr><td colspan="12" class="sub2" style="padding:24px 10px">沒有符合條件的模組。調整篩選條件或 <button class="lnk" data-reset>重設篩選</button>。</td></tr>`;
+  const pg = []; for (let p = 1; p <= pages; p++) pg.push(`<button data-page="${p}" aria-current="${p === L.page}">${p}</button>`);
+  $('#lpager').innerHTML = pages > 1 ? `<button data-page="${L.page - 1}" ${L.page === 1 ? 'disabled' : ''} aria-label="上一頁">‹</button>${pg.join('')}<button data-page="${L.page + 1}" ${L.page === pages ? 'disabled' : ''} aria-label="下一頁">›</button>` : '';
+  live();
+}
+async function exportCSV(){
+  const rows = listRows();
+  const head = ['模組','序號','院區','單位','判定','健康分數','SOH(%)','內阻(mΩ)','峰溫(°C)','SOC誤差(pt)','CV(min)','對稱差(%)','庫倫效率(%)','循環數','主要訊號','建議處置','BMS SOC(%)','電壓(V)','電流(A)','溫度(°C)','運作狀態'];
+  const csv = [head, ...rows.map(m => [m.id, m.serial, SITE[m.site].name, m.ward, ST[m.status].label, f0(m.score), f1(m.raw.cap), f0(m.raw.ir), f1(m.raw.thermal), f1(m.raw.soc), f0(m.raw.cv), f1(m.raw.sym), f1(m.raw.ce), m.cycles, sigText(m), m.action, f0(m.live.bms), f2(m.live.v), f2(m.live.i), f1(m.live.t), STATE[m.dev.state]])]
+    .map(r => r.map(x => `"${String(x).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  await saveFile(`EPB-1001_電池列表_${isoDate(new Date())}.csv`, '﻿' + csv, csv);
+}
+
+/* ============================================================
+   Live updates (every 2 s)
+   ============================================================ */
+function live(){
+  $$('[data-live]').forEach(el => {
+    const k = el.dataset.live, m = MOD[el.dataset.mid];
+    if (k.startsWith('ops-')){ const st = k.slice(4); el.textContent = scopedDev().filter(d => d.state === st).length; return; }
+    if (k === 'online'){ el.textContent = scoped().filter(x => x.dev.offH === 0).length; return; }
+    if (!m) return;
+    const L = m.live, off = m.dev.state === 'off';
+    if (k === 'soc') el.textContent = off ? '—' : f0(L.bms) + '%';
+    else if (k === 'socbar'){ el.style.width = (off ? 0 : L.bms) + '%'; el.style.background = L.bms < 20 ? 'var(--s2)' : 'var(--ink-3)'; }
+    else if (k === 'v') el.textContent = off ? '—' : f2(L.v) + ' V';
+    else if (k === 'i') el.textContent = off ? '—' : (L.i >= 0 ? '+' : '') + f2(L.i) + ' A';
+    else if (k === 't') el.textContent = off ? (el.dataset.compact ? f0((Date.now() - m.dev.lastSeen) / 3600e3) + ' 小時' : ago(m.dev.lastSeen)) : f1(L.t) + '°C';
+    else if (k === 'stateic'){ if (el.dataset.st !== m.dev.state){ el.dataset.st = m.dev.state; el.innerHTML = el.dataset.compact ? `<span class="st-ic ${m.dev.state}" title="${STATE[m.dev.state]}">${ICON[m.dev.state]}${m.dev.state === 'off' ? '離線' : ''}</span>` : stIc(m.dev.state); } }
+  });
+}
+function tick(){
+  DEVICES.forEach(d => stepDevice(d, true));
+  $('#clock').textContent = new Date().toLocaleTimeString('zh-TW', {hour12:false});
+  live();
+  if (S.drawer) renderDrawerLive();
+  if (liveEventFlag && S.route === 'overview'){ renderFeed(); }
+  liveEventFlag = false;
+}
+
+/* ============================================================
+   Drawer — module detail
+   ============================================================ */
+function openDrawer(mid){
+  const m = MOD[mid]; if (!m) return;
+  S.drawer = mid;
+  const partner = m.dev.mods.find(x => x !== m);
+  const w = openWO(mid);
+  $('#drHead').innerHTML = `<div><h2>${m.id}${pill(m.status)}${m.dev.offH ? '<span class="pill off">離線</span>' : ''}</h2>
+    <div class="meta">HID-2340 <span class="mono">${m.dev.id}</span>・${esc(SITE[m.site].name)} ${esc(m.ward)}・序號 <span class="mono">${m.serial}</span>・${m.cycles} 循環</div></div>
+    <button class="x" id="drClose" aria-label="關閉"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`;
+  $('#drBody').innerHTML = `
+    <div class="dcard"><div class="verdict">
+      <div class="bigscore ${m.status}"><b>${f0(m.score)}</b><span>健康分數</span></div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div class="action ${m.status === 'good' ? '' : m.status}"><b>${m.status === 'good' ? '判定：良好' : `建議處置・${esc(m.due)}`}</b><span>${esc(m.action)}</span></div>
+        ${m.vetoes.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap">${m.vetoes.map(x => `<span class="chip veto">否決：${esc(x)}</span>`).join('')}</div>` : ''}
+        <div class="btnrow">${w ? `<span class="chip">${w.id}・${w.status}</span>` : m.status !== 'good' ? `<button class="btn sm pri" data-wo="${m.id}">建立維護工單</button>` : ''}<button class="btn sm" data-ask="${m.id}">詢問 AI 助理</button><button class="btn sm" data-modrep="${m.id}">產生模組報告</button></div>
+      </div></div></div>
+    <div class="dcard"><h3>即時數據<span id="drSeen"></span></h3><div class="lt" id="drLive"></div></div>
+    <div class="dcard"><h3>七項診斷指標<span>子分數 0–100，越高越健康；細線為 60 分（良好門檻）</span></h3><div class="ind">${IND.map(i => `
+      <div class="row" data-tip="<b>${i.name}</b><br>${esc(i.desc)}<br>權重 ${f0(i.w * 100)}%"><span>${i.name}</span><span class="trk"><i style="width:${clamp(m.subs[i.k], 2, 100)}%;background:${scoreColor(m.subs[i.k])}"></i><em style="left:60%"></em></span><span class="raw">${esc(i.fmt(m.raw[i.k]))}</span><b>${f0(m.subs[i.k])}</b></div>`).join('')}</div></div>
+    <div class="dcard"><h3>SOH 趨勢<span>最近 12 個循環</span></h3><div id="drSoh"></div></div>
+    <div class="dcard"><h3>內阻代理值趨勢<span>最近 12 個循環（mΩ）</span></h3><div id="drIr"></div></div>
+    <div class="dcard"><h3>雙模組比較<span>同一 EPB-1001 擴充盒內並聯共擔</span></h3>
+      <div class="tbl-wrap"><table><thead><tr><th>項目</th><th class="r">${m.slot}（本模組）</th><th class="r"><button class="lnk mono" data-open="${partner.id}">${partner.slot}</button></th><th class="r">差異</th></tr></thead><tbody>
+      ${[['SOH', x => x.raw.cap, f1, '%'], ['內阻代理值', x => x.raw.ir, f0, ' mΩ'], ['峰值溫度', x => x.raw.thermal, f1, ' °C'], ['庫倫效率', x => x.raw.ce, f1, '%'], ['SOC 誤差', x => x.raw.soc, f1, ' pt'], ['健康分數', x => x.score, f0, '']].map(([l, g, f, u]) => `<tr><td>${l}</td><td class="r num">${f(g(m))}${u}</td><td class="r num">${f(g(partner))}${u}</td><td class="r num">${(g(m) - g(partner) >= 0 ? '+' : '') + f(g(m) - g(partner))}${u}</td></tr>`).join('')}
+      <tr><td>放電電流分配差異</td><td colspan="3" class="r num">${f1(m.raw.sym)}%</td></tr></tbody></table></div></div>
+    <div class="dcard"><h3>事件紀錄<span>最近 10 筆</span></h3><ul class="feed">${EVENTS.filter(e => e.mid === m.id || (e.mid === m.dev.mods[0].id && e.msg.startsWith(m.dev.id))).slice(0, 10).map(e => `<li><span class="sev ${e.sev}">${e.sev === 'crit' ? '■' : e.sev === 'warn' ? '▲' : 'i'}</span><span>${esc(e.msg)}</span><span class="when">${fmtDT(new Date(e.ts))}</span></li>`).join('') || '<li><span></span><span class="sub2">沒有事件</span><span></span></li>'}</ul></div>`;
+  $('#drawer').classList.add('on'); $('#drawer').setAttribute('aria-hidden', 'false'); $('#scrim').classList.add('on');
+  $('#drClose').addEventListener('click', closeDrawer);
+  $('#drBody').scrollTop = 0;
+  renderDrawerLive();
+  requestAnimationFrame(() => {
+    const lo = Math.min(78, Math.floor(Math.min(...m.sohTrend.map(p => p.v)) - 1)), hi = Math.min(101, Math.ceil(Math.max(...m.sohTrend.map(p => p.v)) + 1));
+    lineChart($('#drSoh'), {labels:m.sohTrend.map(p => 'C' + p.c), series:[{name:m.id + ' SOH', values:m.sohTrend.map(p => p.v), color:'var(--s1)'}], thresholds:[{y:80, label:'建議更換門檻 80%', color:'var(--crit)'}], yMin:lo, yMax:hi, yTicks:[lo, Math.round((lo + hi) / 2), hi], yFmt:v => v + '%', h:180, tipFmt:v => f1(v) + '%', tipTitle:i => '循環 ' + m.sohTrend[i].c, aria:'SOH 趨勢', ml:42});
+    const ilo = Math.floor(Math.min(...m.irTrend.map(p => p.v)) / 10) * 10 - 10, ihi = Math.max(170, Math.ceil(Math.max(...m.irTrend.map(p => p.v)) / 10) * 10 + 10);
+    lineChart($('#drIr'), {labels:m.irTrend.map(p => 'C' + p.c), series:[{name:m.id + ' 內阻', values:m.irTrend.map(p => p.v), color:'var(--s2)'}], thresholds:[{y:160, label:'需注意 160 mΩ', color:'var(--warn-ink)'}], yMin:ilo, yMax:ihi, yTicks:[ilo, Math.round((ilo + ihi) / 20) * 10, ihi], h:160, tipFmt:v => f0(v) + ' mΩ', tipTitle:i => '循環 ' + m.irTrend[i].c, aria:'內阻趨勢', ml:42});
+  });
+  $('#drClose').focus();
+}
+function renderDrawerLive(){
+  const m = MOD[S.drawer]; if (!m) return;
+  const H = m.hist, L = m.live, off = m.dev.state === 'off';
+  $('#drSeen').textContent = off ? `最後回報 ${ago(m.dev.lastSeen)}・顯示最後一筆資料` : `${STATE[m.dev.state]}・每 2 秒更新`;
+  const gap = L.bms - L.soc;
+  $('#drLive').innerHTML = `
+    <div class="tile"><span class="lbl">電壓</span><span class="v">${f2(L.v)}<small>V</small></span>${spark(H.v, 'var(--s1)')}</div>
+    <div class="tile"><span class="lbl">電流（+ 充電／− 放電）</span><span class="v">${(L.i >= 0 ? '+' : '') + f2(L.i)}<small>A</small></span>${spark(H.i, 'var(--s1)')}</div>
+    <div class="tile"><span class="lbl">溫度</span><span class="v">${f1(L.t)}<small>°C</small></span>${spark(H.t, 'var(--s2)')}</div>
+    <div class="tile"><span class="lbl">SOC：BMS 回報／庫倫計數參考</span><span class="v">${f0(L.bms)}%<small>參考 ${f0(L.soc)}%${Math.abs(gap) >= 3 ? `・偏差 ${gap > 0 ? '+' : ''}${f0(gap)} pt` : ''}</small></span>${spark(H.bms, 'var(--s1)')}</div>`;
+}
+function closeDrawer(){ S.drawer = null; $('#drawer').classList.remove('on'); $('#drawer').setAttribute('aria-hidden', 'true'); $('#scrim').classList.remove('on'); hideTip(); }
+$('#scrim').addEventListener('click', closeDrawer);
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.drawer) closeDrawer(); });
+
+/* ============================================================
+   Page: AI assistant
+   ============================================================ */
+let sampleFn = null, aiState = 'pending', aiCtl = null;
+function aiRules(){
+  const mods = MODULES;
+  const lines = mods.map(m => `${m.id}|${SITE[m.site].name}/${m.ward}|${ST[m.status].label}|分數${f0(m.score)}|SOH${f1(m.raw.cap)}%|內阻${f0(m.raw.ir)}mΩ|峰溫${f1(m.raw.thermal)}°C|SOC誤差${f1(m.raw.soc)}pt|CV${f0(m.raw.cv)}分|對稱差${f1(m.raw.sym)}%|CE${f1(m.raw.ce)}%|循環${m.cycles}|即時:${STATE[m.dev.state]} BMS-SOC${f0(m.live.bms)}% ${f2(m.live.v)}V ${f2(m.live.i)}A ${f1(m.live.t)}°C${m.vetoes.length ? '|否決:' + m.vetoes.join('、') : ''}${m.sigK ? '|訊號:' + sigText(m) : ''}${m.status !== 'good' ? `|已持續${m.since}天|建議:${m.action}` : ''}${openWO(m.id) ? '|工單:' + openWO(m.id).id + openWO(m.id).status : ''}`).join('\n');
+  return `你是 PurismEV「BAI 電池資產智慧」平台內的 AI 電池診斷助理，使用者是 誠屏（Avalue）的維運與服務團隊。他們監控醫院中 HID-2340 醫療平板所搭配的 EPB-1001 雙模組 NMC 鋰電池擴充盒（每台 B1、B2 兩個熱插拔模組並聯共擔放電；每模組 14.4 V、實測滿充 6.46 Ah；放電截止 13.0 V；CC 1.55 A 充到 16.8 V 再 CV 收斂）。
+
+診斷方法：七項指標（容量衰退/SOH、內阻代理值、熱行為、SOC 一致性、充電終止曲線、雙模組對稱性、庫倫效率）各轉為 0–100 健康子分數（100 最好），加權為綜合健康分數。≥60 良好、40–59 需注意、<40 建議更換。硬性否決項（SOH<80%、峰值溫度>45°C、模組間顯著失衡、通訊中斷>24 小時）任一觸發即判定建議更換，不被其他良好指標平均掉。單一子分數<50 至少判定需注意。POC 實測發現：B1 電量計在連續循環無靜置時 FCC 學習值凍結，BMS SOC 往樂觀方向漂移，可能造成任務中突然斷電；電池本體仍良好，需完整放電加靜置校準。權重為暫定值，會隨更多循環數據校準。
+
+回答規則：一律使用繁體中文。先給結論，再列依據的數值。提到模組時寫完整 ID（例如 A003-B1）。建議處置要對應觀察到的訊號。不要編造資料裡沒有的數值或模組；資料不足時說明還需要什麼資料。回答控制在 250 字以內，條列用「- 」開頭，可用 **粗體**，不要用表格或標題。這是展示用模擬資料。
+
+現在時間：${new Date().toLocaleString('zh-TW', {hour12:false})}
+使用者目前篩選院區：${S.site === 'all' ? '全部院區' : SITE[S.site].name}
+院區：${SITES.map(s => `${s.id}=${s.name}`).join('、')}
+
+機隊資料（每行一個模組）：
+${lines}`;
+}
+function localAnswer(q){
+  const ids = (q.toUpperCase().match(/[ABC]\d{3}-B[12]/g) || []).filter(id => MOD[id]);
+  const devId = (q.toUpperCase().match(/\b[ABC]\d{3}\b/) || [])[0];
+  const mods = scoped();
+  if (ids.length){
+    const m = MOD[ids[0]];
+    return `**${m.id}：${ST[m.status].label}**（健康分數 ${f0(m.score)}）\n- 位置：${SITE[m.site].name} ${m.ward}，${m.cycles} 循環\n- SOH ${f1(m.raw.cap)}%、內阻代理值 ${f0(m.raw.ir)} mΩ、峰溫 ${f1(m.raw.thermal)} °C、SOC 誤差 ${f1(m.raw.soc)} pt\n- 主要訊號：${sigText(m)}${m.vetoes.length ? `\n- 否決項：${m.vetoes.join('、')}` : ''}\n- 建議處置（${m.due}）：${m.action}`;
+  }
+  if (devId && DEVICES.find(d => d.id === devId)){
+    const d = DEVICES.find(x => x.id === devId);
+    return `**${d.id}**（${SITE[d.site].name} ${d.ward}）目前${STATE[d.state]}：\n` + d.mods.map(m => `- ${m.id}：${ST[m.status].label}，分數 ${f0(m.score)}，BMS SOC ${f0(m.live.bms)}%`).join('\n');
+  }
+  if (/電量計|SOC|飄移|校準|斷電/.test(q)){
+    const s = mods.filter(m => m.sigK === 'soc').sort((a, b) => b.raw.soc - a.raw.soc);
+    return `目前有 **${s.length} 個模組** 出現電量計飄移：\n${s.map(m => `- ${m.id}：BMS 比庫倫計數高 ${f1(m.raw.soc)} pt`).join('\n')}\n電池本體指標正常，問題在 BMS 電量計往樂觀方向漂移，系統會以為還有電、實際已見底。建議執行完整放電並靜置 2 小時以上讓電量計重新學習 FCC。`;
+  }
+  if (/溫度|熱|高溫/.test(q)){
+    const s = mods.filter(m => m.raw.thermal > 41).sort((a, b) => b.raw.thermal - a.raw.thermal);
+    return `峰溫偏高的模組：\n${s.map(m => `- ${m.id}（${m.ward}）：${f1(m.raw.thermal)} °C，${ST[m.status].label}`).join('\n')}\nNMC 充電上限約 45 °C，超過即觸發否決項。建議先檢查充電器與機殼通風。`;
+  }
+  if (/更換|維修|立即|優先|維護|工單|清單/.test(q)){
+    const c = mods.filter(m => m.status === 'crit').sort(byPriority), w = mods.filter(m => m.status === 'warn').sort(byPriority).slice(0, 4);
+    return `**需要立即處置（${c.length}）**\n${c.map(m => `- ${m.id}：${sigText(m)} → ${m.action}`).join('\n')}\n**排入下次維護（前 ${w.length} 項）**\n${w.map(m => `- ${m.id}：${sigText(m)}`).join('\n')}`;
+  }
+  if (/報表|報告/.test(q)) return '可以到「報表」頁選擇時間區間與內容區塊，產生機隊健康報告或單一模組報告，並下載 HTML 或 CSV。';
+  const c = counts(mods), avg = mods.reduce((a, m) => a + m.score, 0) / mods.length;
+  return `${S.site === 'all' ? '全部院區' : SITE[S.site].name}目前監控 **${mods.length} 個模組**，平均健康分數 ${f1(avg)}：\n- 良好 ${c.good}、需注意 ${c.warn}、建議更換 ${c.crit}\n- 最優先：${mods.filter(m => m.status === 'crit').sort(byPriority).slice(0, 3).map(m => m.id).join('、')}\n你可以輸入模組 ID（例如 A003-B1）查看細節。`;
+}
+function md(t){
+  const lines = esc(t).split('\n'); let out = '', inUl = false, inOl = false;
+  const inline = s => s.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\b([ABC]\d{3}-B[12])\b/g, (x, id) => MOD[id] ? `<button class="mchip" data-open="${id}">${id}</button>` : x);
+  const close = () => { if (inUl) out += '</ul>'; if (inOl) out += '</ol>'; inUl = inOl = false; };
+  lines.forEach(l => {
+    const t2 = l.trim();
+    if (/^[-•*]\s+/.test(t2)){ if (!inUl){ close(); out += '<ul>'; inUl = true; } out += `<li>${inline(t2.replace(/^[-•*]\s+/, ''))}</li>`; }
+    else if (/^\d+[.)]\s+/.test(t2)){ if (!inOl){ close(); out += '<ol>'; inOl = true; } out += `<li>${inline(t2.replace(/^\d+[.)]\s+/, ''))}</li>`; }
+    else if (!t2){ close(); }
+    else { close(); out += `<p>${inline(t2.replace(/^#+\s*/, ''))}</p>`; }
+  });
+  close(); return out;
+}
+function msgActions(text){
+  const ids = [...new Set((text.match(/[ABC]\d{3}-B[12]/g) || []).filter(id => MOD[id] && MOD[id].status !== 'good' && !openWO(id)))].slice(0, 3);
+  return ids.length ? `<div class="acts">${ids.map(id => `<button class="btn sm" data-wo="${id}">為 ${id} 建立工單</button>`).join('')}</div>` : '';
+}
+function renderAssistant(){
+  const v = $('#v-assistant');
+  if (!v.dataset.built){
+    const c = counts(MODULES), crit = MODULES.filter(m => m.status === 'crit').sort(byPriority);
+    S.chat.push({role:'assistant', local:true, content:`你好，我是 BAI 電池診斷助理。目前監控 ${MODULES.length} 個 EPB-1001 模組：**${c.crit} 個建議更換**、**${c.warn} 個需注意**、${c.good} 個良好。\n最優先處理：\n${crit.slice(0, 3).map(m => `- ${m.id}：${sigText(m)}`).join('\n')}\n你可以直接問我任一模組、院區，或請我整理今天的維修工作清單。`});
+    v.innerHTML = `<div class="chatwrap">
+      <div class="card chat">
+        <div class="chd"><h2>AI 助理</h2><span class="aistat" id="aiStat"><i></i><span>連線中…</span></span><div style="margin-left:auto" class="sub2">回答依據即時機隊資料</div></div>
+        <div class="msgs" id="msgs" aria-live="polite"></div>
+        <form class="composer" id="cform"><label for="cin" style="position:absolute;left:-9999px">輸入問題</label><textarea id="cin" rows="1" placeholder="例如：B004 兩顆電池差在哪裡？"></textarea><button class="btn" type="button" id="cstop" hidden>停止</button><button class="btn pri" type="submit" id="csend">送出</button></form>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="card"><header><h2>快速提問</h2></header><div class="qp">${['哪些電池需要立即維修？','A003-B1 的電量計問題是什麼原因？','北區醫學中心目前狀況如何？','本週溫度異常的模組有哪些？','幫我擬一份給維修團隊的今日工作清單'].map(q => `<button data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div></div>
+        <div class="card"><header><h2>自動化工作流程</h2><span class="hint">展示設定</span></header>
+          ${[['每日健康摘要','每天 08:00 寄送至維運群組',true],['異常升級通知','判定變為建議更換時即時通知',true],['每週維護報告','每週一自動產生並寄送 PDF',false]].map(([a, b, on], i) => `<label class="sw-row" for="auto${i}"><span>${a}<small>${b}</small></span><input class="toggle" type="checkbox" id="auto${i}" ${on ? 'checked' : ''}></label>`).join('')}
+        </div>
+      </div></div>`;
+    v.dataset.built = '1';
+    $('#cform').addEventListener('submit', e => { e.preventDefault(); ask($('#cin').value); });
+    $('#cin').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); ask($('#cin').value); } });
+    $('#cin').addEventListener('input', e => { e.target.style.height = 'auto'; e.target.style.height = Math.min(140, e.target.scrollHeight) + 'px'; });
+    $('#cstop').addEventListener('click', () => aiCtl?.abort());
+    v.addEventListener('click', e => { const b = e.target.closest('[data-q]'); if (b) ask(b.dataset.q); });
+    drawMsgs();
+  }
+  setAiStat();
+}
+function setAiStat(){
+  const el = $('#aiStat'); if (!el) return;
+  el.className = 'aistat' + (aiState === 'on' ? '' : ' offline');
+  el.querySelector('span').textContent = aiState === 'on' ? 'AI 已連線' : aiState === 'pending' ? '連線中…' : '示範模式（規則式回覆）';
+}
+function drawMsgs(){
+  const box = $('#msgs'); if (!box) return;
+  box.innerHTML = S.chat.map(m => `<div class="msg ${m.role === 'user' ? 'u' : 'a'}"><span class="who">${m.role === 'user' ? '誠屏 維運團隊' : 'BAI 助理' + (m.offline ? '・示範回覆' : '')}</span><div class="bub">${m.pending && !m.content ? '<span class="typing">分析機隊資料中…</span>' : m.role === 'user' ? esc(m.content) : md(m.content)}</div>${m.role === 'assistant' && !m.pending && !m.local ? msgActions(m.content) : ''}</div>`).join('');
+  box.scrollTop = box.scrollHeight;
+}
+async function ask(q){
+  q = (q || '').trim(); if (!q || S.aiBusy) return;
+  if (S.route !== 'assistant'){ location.hash = 'assistant'; route(); }
+  $('#cin').value = ''; $('#cin').style.height = 'auto';
+  S.chat.push({role:'user', content:q});
+  const msg = {role:'assistant', content:'', pending:true}; S.chat.push(msg); drawMsgs();
+  S.aiBusy = true; $('#csend').disabled = true;
+  if (sampleFn && aiState === 'on'){
+    $('#cstop').hidden = false;
+    aiCtl = new AbortController();
+    const turns = S.chat.filter(m => !m.local && !m.pending && m.content).slice(-12);
+    while (turns.length && turns[0].role !== 'user') turns.shift();
+    try {
+      const {text} = await sampleFn([{role:'user', content:aiRules()}, ...turns.map(t => ({role:t.role, content:t.content}))], {cache:false, modelTier:'quick', signal:aiCtl.signal, onText:({text}) => { msg.content = text; msg.pending = false; drawMsgs(); }});
+      msg.content = text;
+    } catch (e){
+      if (e && (e.code === 'not_granted' || e.code === 'sampling_disabled' || e.code === 'not_declared' || e.code === 'capability_disabled' || e.code === 'capability_removed')){ aiState = 'off'; setAiStat(); msg.content = localAnswer(q); msg.offline = true; }
+      else if (e && e.code === 'cancelled'){ msg.content = (e.text || '') + (e.text ? '\n\n（已停止）' : '已停止回覆。'); }
+      else if (e && e.code === 'rate_limited'){ msg.content = (e.text ? e.text + '\n\n' : '') + '目前請求太頻繁，請稍候再試。以下為規則式摘要：\n' + localAnswer(q); msg.offline = true; }
+      else { msg.content = (e && e.text ? e.text + '\n\n' : '') + '連線中斷，以下為規則式回覆：\n' + localAnswer(q); msg.offline = true; }
+    }
+  } else {
+    await new Promise(r => setTimeout(r, 600));
+    msg.content = localAnswer(q); msg.offline = true;
+  }
+  msg.pending = false; S.aiBusy = false; $('#csend').disabled = false; $('#cstop').hidden = true; drawMsgs();
+}
+(async () => {
+  try {
+    const c = window.claude && typeof window.claude.use === 'function' ? window.claude : null;
+    sampleFn = c ? await c.use('sample') : null;
+    aiState = sampleFn ? 'on' : 'off';
+  } catch { aiState = 'off'; }
+  setAiStat();
+})();
+
+/* ============================================================
+   Page: Reports
+   ============================================================ */
+let downloadsNs = null;
+(async () => { try { const c = window.claude && typeof window.claude.use === 'function' ? window.claude : null; downloadsNs = c ? await c.use('downloads') : null; } catch { downloadsNs = null; } })();
+const toastMsg = (t) => { let el = $('#toast'); if (!el){ el = document.createElement('div'); el.id = 'toast'; el.setAttribute('role', 'status'); el.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:8px;font-size:13px;z-index:120;box-shadow:0 6px 18px rgba(0,0,0,.2);transition:opacity .2s'; document.body.appendChild(el); } el.textContent = t; el.style.opacity = '1'; clearTimeout(el._t); el._t = setTimeout(() => el.style.opacity = '0', 2600); };
+async function saveFile(name, data, copyFallback){
+  if (downloadsNs){
+    try { await downloadsNs.save({filename:name, data}); toastMsg('已下載 ' + name); return; }
+    catch (e){ if (e && e.code === 'declined') return; if (e && e.code === 'rate_limited'){ toastMsg('下載視窗已開啟，請稍候'); return; } }
+  }
+  if (!window.claude){
+    try { const url = URL.createObjectURL(data instanceof Blob ? data : new Blob([data], {type: name.endsWith('.csv') ? 'text/csv;charset=utf-8' : 'text/html;charset=utf-8'})); const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000); toastMsg('已下載 ' + name); return; } catch {}
+  }
+  try { await navigator.clipboard.writeText(copyFallback ?? data); toastMsg('此檢視無法下載檔案，內容已複製到剪貼簿'); }
+  catch { toastMsg('此檢視無法下載或複製檔案'); }
+}
+function repRange(){
+  const r = S.rep; const today = startOfDay(new Date());
+  if (r.preset !== 'custom'){
+    const n = r.preset === 'q' ? Math.floor((today - new Date(today.getFullYear(), Math.floor(today.getMonth() / 3) * 3, 1)) / DAY) : Number(r.preset) - 1;
+    r.end = isoDate(today); r.start = isoDate(new Date(today - n * DAY));
+  }
+  return [new Date(r.start + 'T00:00:00'), new Date(r.end + 'T23:59:59')];
+}
+function renderReports(){
+  const v = $('#v-reports'), r = S.rep;
+  if (!v.dataset.built){
+    repRange();
+    v.innerHTML = `<div class="repwrap">
+      <div style="display:flex;flex-direction:column;gap:16px">
+      <form class="card form" id="rform">
+        <header style="margin:0"><h2 style="font-size:15px">產生報表</h2></header>
+        <div class="fld"><label for="rtype">報表類型</label><select class="sel" id="rtype"><option value="fleet">機隊健康與維護報告</option><option value="module">單一模組診斷報告</option></select></div>
+        <div class="fld" id="rmodf" hidden><label for="rmod">模組</label><select class="sel" id="rmod">${MODULES.slice().sort(byPriority).map(m => `<option value="${m.id}">${m.id}・${ST[m.status].label}</option>`).join('')}</select></div>
+        <div class="fld"><span class="lb" id="rplbl">時間區間</span><div class="presets" role="group" aria-labelledby="rplbl">${[['7','最近 7 天'],['30','最近 30 天'],['90','最近 90 天'],['q','本季'],['custom','自訂']].map(([k, l]) => `<button type="button" data-preset="${k}" aria-pressed="${r.preset === k}">${l}</button>`).join('')}</div>
+          <div class="dates"><input class="inp" type="date" id="rstart" aria-label="開始日期"><span>至</span><input class="inp" type="date" id="rend" aria-label="結束日期"></div><span class="err" id="rerr" role="alert"></span></div>
+        <div class="fld"><label for="rsite">院區</label><select class="sel" id="rsite"><option value="all">全部院區</option>${SITES.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}</select></div>
+        <div class="fld" id="rsecf"><span class="lb">內容區塊</span><div class="checks">${[['summary','執行摘要'],['trend','健康分數趨勢'],['status','狀態分布與院區比較'],['issues','異常訊號統計'],['queue','維護優先清單'],['wo','工單執行紀錄'],['alerts','警示事件紀錄'],['method','方法論與限制']].map(([k, l]) => `<label><input type="checkbox" data-sec="${k}" ${r.secs[k] ? 'checked' : ''}>${l}</label>`).join('')}</div></div>
+        <button class="btn pri" type="submit">產生報表</button>
+      </form>
+      <div class="card"><header><h2>本次產生的報表</h2></header><ul class="replist" id="rlist"></ul></div>
+      </div>
+      <div style="min-width:0"><div class="repbar"><button class="btn" id="rdl">下載 HTML</button><button class="btn" id="rcsv">下載警示 CSV</button><button class="btn" id="rcopy">複製摘要</button><span class="note" id="rnote"></span></div><div id="rprev"></div></div>
+    </div>`;
+    v.dataset.built = '1';
+    $('#rtype').addEventListener('change', e => { r.type = e.target.value; $('#rmodf').hidden = r.type !== 'module'; $('#rsecf').hidden = r.type === 'module'; });
+    $('#rmod').addEventListener('change', e => r.mid = e.target.value);
+    $('#rsite').addEventListener('change', e => r.site = e.target.value);
+    v.addEventListener('click', e => { const b = e.target.closest('[data-preset]'); if (!b) return; r.preset = b.dataset.preset; $$('[data-preset]').forEach(x => x.setAttribute('aria-pressed', x === b)); if (r.preset !== 'custom') repRange(); syncDates(); });
+    ['rstart','rend'].forEach(id => $('#' + id).addEventListener('change', () => { r.preset = 'custom'; r.start = $('#rstart').value; r.end = $('#rend').value; $$('[data-preset]').forEach(x => x.setAttribute('aria-pressed', x.dataset.preset === 'custom')); }));
+    $$('[data-sec]').forEach(c => c.addEventListener('change', () => r.secs[c.dataset.sec] = c.checked));
+    $('#rform').addEventListener('submit', e => { e.preventDefault(); generate(); });
+    $('#rdl').addEventListener('click', () => { const rep = S.reports[S.curRep]; if (!rep) return; saveFile(rep.file + '.html', exportHTML(rep), rep.summary); });
+    $('#rcsv').addEventListener('click', () => { const rep = S.reports[S.curRep]; if (!rep) return; const csv = [['時間','模組','院區','等級','訊息'], ...rep.events.map(e => [fmtDate(new Date(e.ts)) + ' ' + fmtDT(new Date(e.ts)).slice(6), e.mid, SITE[MOD[e.mid].site].name, e.sev === 'crit' ? '嚴重' : e.sev === 'warn' ? '警告' : '資訊', e.msg])].map(row => row.map(x => `"${String(x).replace(/"/g, '""')}"`).join(',')).join('\r\n'); saveFile(rep.file + '_警示.csv', '﻿' + csv, csv); });
+    $('#rcopy').addEventListener('click', async () => { const rep = S.reports[S.curRep]; if (!rep) return; try { await navigator.clipboard.writeText(rep.summary); toastMsg('摘要已複製'); } catch { toastMsg('無法存取剪貼簿'); } });
+    $('#rsite').value = S.site;
+    r.site = S.site;
+    syncDates();
+    generate();
+  } else if (S.curRep != null) {
+    showReport(S.curRep);
+  }
+}
+function syncDates(){ $('#rstart').value = S.rep.start; $('#rend').value = S.rep.end; $('#rstart').max = $('#rend').max = isoDate(new Date()); $('#rstart').min = $('#rend').min = isoDate(new Date(now - (HDAYS - 1) * DAY)); }
+function generate(){
+  const r = S.rep; $('#rerr').textContent = '';
+  if (r.preset === 'custom'){ r.start = $('#rstart').value; r.end = $('#rend').value; }
+  if (!r.start || !r.end){ $('#rerr').textContent = '請選擇開始與結束日期。'; return; }
+  let [a, b] = repRange();
+  if (a > b){ $('#rerr').textContent = '開始日期需早於結束日期。'; return; }
+  const minD = startOfDay(new Date(now - (HDAYS - 1) * DAY));
+  let note = '';
+  if (a < minD){ a = minD; r.start = isoDate(a); syncDates(); note = `可查詢範圍為最近 ${HDAYS} 天，開始日期已調整為 ${fmtDate(a)}。`; }
+  if (b > new Date()){ b = new Date(); }
+  if (!Object.values(r.secs).some(Boolean) && r.type === 'fleet'){ $('#rerr').textContent = '請至少勾選一個內容區塊。'; return; }
+  const rep = buildReport(r.type, a, b, r.site, r.mid, {...r.secs}); rep.note = note;
+  S.reports.unshift(rep); S.curRep = 0;
+  $('#rlist').innerHTML = S.reports.map((x, i) => `<li><button data-rep="${i}"><span>${esc(x.title)}</span><small>${esc(x.period)}・${esc(x.scope)}</small></button></li>`).join('');
+  showReport(0);
+}
+function showReport(i){
+  const rep = S.reports[i]; S.curRep = i;
+  $('#rprev').innerHTML = rep.html;
+  $('#rnote').textContent = rep.note || `產生於 ${fmtDT(rep.created)}`;
+  rep.charts.forEach(fn => fn());
+}
+function daysAgoOf(d){ return Math.max(0, Math.round((startOfDay(new Date()) - startOfDay(d)) / DAY)); }
+function buildReport(type, a, b, site, mid, secs){
+  const mods = site === 'all' ? MODULES : MODULES.filter(m => m.site === site);
+  const scope = site === 'all' ? '全部院區' : SITE[site].name;
+  const dA = daysAgoOf(a), dB = daysAgoOf(b);
+  const period = `${fmtDate(a)} – ${fmtDate(b)}`, nDays = dA - dB + 1;
+  const created = new Date();
+  const id = 'RPT-' + isoDate(created).replace(/-/g, '') + '-' + String(S.reports.length + 1).padStart(2, '0');
+  const charts = [];
+  const head = (title, sub) => `<div class="rhead"><div><h1>${esc(title)}</h1><div style="color:#4d5c5e;font-size:13px">${esc(sub)}</div></div><div class="logo"><b>PurismEV BAI</b>Battery Assets Intelligence<br>報告編號 <span class="mono">${id}</span></div></div>
+    <div class="rmeta"><span>客戶 <b>誠屏科技 Avalue</b></span><span>期間 <b>${period}</b>（${nDays} 天）</span><span>範圍 <b>${esc(scope)}</b></span><span>產生時間 <b>${fmtDate(created)} ${fmtDT(created).slice(6)}</b></span></div>`;
+  const foot = `<div class="rfoot"><span>PurismEV 九十米股份有限公司・BAI 電池健康診斷</span><span>展示／模擬資料，非實際 POC 實測數據</span></div>`;
+  if (type === 'module'){
+    const m = MOD[mid];
+    const evs = EVENTS.filter(e => (e.mid === m.id) && e.ts >= a.getTime() && e.ts <= b.getTime());
+    const st = statusAt(m, dB);
+    const html = `<article class="report">${head(`${m.id} 電池模組診斷報告`, `HID-2340 ${m.dev.id}・${SITE[m.site].name} ${m.ward}・序號 ${m.serial}`)}
+      <h2>判定結果<span>期末（${fmtDate(b)}）</span></h2>
+      <div class="rk"><div><small>綜合健康分數</small><b>${f0(dB ? scoreAt(m, dB) : m.score)}</b><em>/ 100</em></div><div><small>判定</small><b style="font-size:17px"><span class="tg ${st}">${ST[st].label}</span></b></div><div><small>SOH</small><b>${f1(m.raw.cap)}%</b><em>滿充 ${f2(RATED_AH * m.raw.cap / 100)} Ah</em></div><div><small>累計循環</small><b>${m.cycles}</b><em>推估約 690 次達 80%</em></div></div>
+      <div class="callout"><b>建議處置（${esc(m.due)}）：</b>${esc(m.action)}${m.vetoes.length ? `<br><b>觸發否決項：</b>${esc(m.vetoes.join('、'))}` : ''}</div>
+      <h2>七項診斷指標</h2><table><thead><tr><th>指標</th><th>說明</th><th>實測讀值</th><th>子分數</th><th>評估</th></tr></thead><tbody>${IND.map(i => `<tr><td>${i.name}</td><td style="color:#4d5c5e">${esc(i.desc)}</td><td>${esc(i.fmt(m.raw[i.k]))}</td><td>${f0(m.subs[i.k])}</td><td><span class="tg ${m.subs[i.k] >= 60 ? 'good' : m.subs[i.k] >= 40 ? 'warn' : 'crit'}">${m.subs[i.k] >= 60 ? '良好' : m.subs[i.k] >= 40 ? '需注意' : '異常'}</span></td></tr>`).join('')}</tbody></table>
+      <h2>SOH 趨勢<span>最近 12 個循環</span></h2><div id="rc-soh"></div>
+      <h2>期間事件<span>${evs.length} 筆</span></h2>${evs.length ? `<table><thead><tr><th>時間</th><th>等級</th><th>內容</th></tr></thead><tbody>${evs.map(e => `<tr><td>${fmtDate(new Date(e.ts))}</td><td>${e.sev === 'crit' ? '嚴重' : e.sev === 'warn' ? '警告' : '資訊'}</td><td>${esc(e.msg)}</td></tr>`).join('')}</tbody></table>` : '<p>此期間沒有事件紀錄。</p>'}
+      <h2>方法論與限制</h2><p>各指標轉換為 0–100 健康子分數後加權；權重為暫定值，將隨循環數據與樣本數持續校準。每模組僅一個溫度感測器且無單芯電壓，對稱性以 B1／B2 比較作為替代指標。</p>${foot}</article>`;
+    charts.push(() => { const el = $('#rc-soh'); if (!el) return; const lo = Math.min(78, Math.floor(Math.min(...m.sohTrend.map(p => p.v)) - 1)), hi = Math.min(101, Math.ceil(Math.max(...m.sohTrend.map(p => p.v)) + 1)); lineChart(el, {labels:m.sohTrend.map(p => 'C' + p.c), series:[{name:'SOH', values:m.sohTrend.map(p => p.v), color:'#2a78d6'}], thresholds:[{y:80, label:'建議更換門檻 80%', color:'#d03b3b'}], yMin:lo, yMax:hi, yTicks:[lo, hi], yFmt:v => v + '%', h:170, ink:'#7a8a8d', grid:'#e3e9ea', surf:'#fff', tipFmt:v => f1(v) + '%', ml:42}); });
+    const summary = `${m.id} 診斷摘要（${period}）\n判定：${ST[st].label}，健康分數 ${f0(m.score)}，SOH ${f1(m.raw.cap)}%\n主要訊號：${sigText(m)}\n建議處置：${m.action}`;
+    return {title:`${m.id} 模組報告`, period, scope:m.id, html, charts, summary, events:evs, created, file:`${id}_${m.id}`};
+  }
+  // fleet report
+  const days = []; for (let d = dA; d >= dB; d--) days.push(d);
+  const series = days.map(d => fleetDay(d, mods));
+  const sA = series[0], sB = series[series.length - 1];
+  const evs = EVENTS.filter(e => e.ts >= a.getTime() && e.ts <= b.getTime() && mods.includes(MOD[e.mid]));
+  const ec = {crit:0, warn:0, info:0}; evs.forEach(e => ec[e.sev]++);
+  const atEnd = mods.map(m => ({m, st:statusAt(m, dB), sc:scoreAt(m, dB)})).filter(x => x.st !== 'good').sort((x, y) => ST[x.st].rank - ST[y.st].rank || x.sc - y.sc);
+  const newIn = mods.filter(m => m.status !== 'good' && m.since <= dA && m.since >= dB);
+  const wos = WOS.filter(w => mods.includes(MOD[w.mid]) && ((w.created >= a.getTime() && w.created <= b.getTime()) || (w.done && w.done >= a.getTime() && w.done <= b.getTime())));
+  const sig = {}; evs.filter(e => e.sev !== 'info' && ACTIONS[e.type]).forEach(e => sig[e.type] = (sig[e.type] || 0) + 1);
+  const sigArr = Object.entries(sig).sort((x, y) => y[1] - x[1]); const sigMax = Math.max(1, ...sigArr.map(x => x[1]));
+  const delta = sB.avg - sA.avg;
+  const summaryLines = [
+    `期末平均健康分數 ${f1(sB.avg)}，較期初 ${delta >= 0 ? '上升' : '下降'} ${f1(Math.abs(delta))} 分。`,
+    `期末判定：良好 ${sB.good}、需注意 ${sB.warn}、建議更換 ${sB.crit}（共 ${mods.length} 個模組）。`,
+    `期間新增 ${newIn.length} 個需處理模組，共 ${evs.length} 筆事件（嚴重 ${ec.crit}、警告 ${ec.warn}）。`,
+    atEnd.filter(x => x.st === 'crit').length ? `需立即處置：${atEnd.filter(x => x.st === 'crit').map(x => x.m.id).join('、')}。` : '期末無需立即更換的模組。',
+    sig.soc ? `電量計飄移為最常見訊號之一（${sig.soc} 筆）；電池本體指標正常，建議以完整放電＋靜置校準處理。` : '',
+  ].filter(Boolean);
+  let html = `<article class="report">${head('EPB-1001 電池機隊健康與維護報告', 'HID-2340 醫療平板・EPB-1001 雙模組 NMC 電池擴充盒')}`;
+  if (secs.summary) html += `<h2>執行摘要</h2><div class="rk"><div><small>期末平均健康分數</small><b>${f1(sB.avg)}</b><em>${delta >= 0 ? '▲' : '▼'} ${f1(Math.abs(delta))} vs 期初</em></div><div><small>建議更換</small><b>${sB.crit}</b><em>期初 ${sA.crit}</em></div><div><small>需注意</small><b>${sB.warn}</b><em>期初 ${sA.warn}</em></div><div><small>警示事件</small><b>${ec.crit + ec.warn}</b><em>嚴重 ${ec.crit}・警告 ${ec.warn}</em></div></div><ul>${summaryLines.map(l => `<li>${esc(l)}</li>`).join('')}</ul>`;
+  if (secs.trend) html += `<h2>健康分數趨勢<span>每日平均</span></h2><div id="rc-trend"></div>`;
+  if (secs.status) html += `<h2>狀態分布與院區比較<span>期末</span></h2><table><thead><tr><th>院區</th><th>模組數</th><th>平均分數</th><th>良好</th><th>需注意</th><th>建議更換</th></tr></thead><tbody>${SITES.filter(s => site === 'all' || s.id === site).map(s => { const sm = mods.filter(m => m.site === s.id), x = fleetDay(dB, sm); return `<tr><td>${s.name}</td><td>${sm.length}</td><td>${f1(x.avg)}</td><td>${x.good}</td><td>${x.warn}</td><td>${x.crit}</td></tr>`; }).join('')}</tbody></table>`;
+  if (secs.issues) html += `<h2>異常訊號統計<span>警告與嚴重事件，依訊號類型</span></h2>${sigArr.length ? sigArr.map(([k, n]) => `<div class="hbar"><span>${ACTIONS[k].sig}</span><span><i style="width:${n / sigMax * 100}%"></i></span><span>${n}</span></div>`).join('') : '<p>此期間沒有警告或嚴重事件。</p>'}`;
+  if (secs.queue) html += `<h2>維護優先清單<span>期末需處理模組 ${atEnd.length} 個</span></h2>${atEnd.length ? `<table><thead><tr><th>#</th><th>模組</th><th>位置</th><th>分數</th><th>判定</th><th>主要訊號</th><th>建議處置</th><th>時限</th></tr></thead><tbody>${atEnd.map((x, i) => `<tr><td>${i + 1}</td><td class="mono">${x.m.id}</td><td>${esc(mLoc(x.m))}</td><td>${f0(x.sc)}</td><td><span class="tg ${x.st}">${ST[x.st].label}</span></td><td>${esc(sigText(x.m))}</td><td>${esc(x.m.action)}</td><td>${esc(x.m.due)}</td></tr>`).join('')}</tbody></table>` : '<p>期末沒有需處理的模組。</p>'}`;
+  if (secs.wo) html += `<h2>工單執行紀錄<span>${wos.length} 張</span></h2>${wos.length ? `<table><thead><tr><th>工單</th><th>模組</th><th>處置內容</th><th>建立</th><th>完成</th><th>狀態</th></tr></thead><tbody>${wos.map(w => `<tr><td class="mono">${w.id}</td><td class="mono">${w.mid}</td><td>${esc(w.act)}</td><td>${fmtDate(new Date(w.created))}</td><td>${w.done ? fmtDate(new Date(w.done)) : '—'}</td><td>${w.status}</td></tr>`).join('')}</tbody></table>` : '<p>此期間沒有工單紀錄。</p>'}`;
+  if (secs.alerts){ const top = evs.filter(e => e.sev !== 'info').slice(0, 20); html += `<h2>警示事件紀錄<span>顯示最新 ${top.length} 筆警告／嚴重事件，完整紀錄請下載 CSV</span></h2>${top.length ? `<table><thead><tr><th>時間</th><th>模組</th><th>等級</th><th>內容</th></tr></thead><tbody>${top.map(e => `<tr><td style="white-space:nowrap">${fmtDate(new Date(e.ts))}</td><td class="mono">${e.mid}</td><td>${e.sev === 'crit' ? '嚴重' : '警告'}</td><td>${esc(e.msg)}</td></tr>`).join('')}</tbody></table>` : '<p>此期間沒有警告或嚴重事件。</p>'}`; }
+  if (secs.method) html += `<h2>方法論與限制</h2><p>七項指標（容量衰退、內阻代理值、熱行為、SOC 一致性、充電終止曲線、雙模組對稱性、庫倫效率）各轉為 0–100 健康子分數並加權為綜合分數：≥ 60 良好、40–59 需注意、&lt; 40 建議更換。硬性否決項（SOH &lt; 80%、峰溫 &gt; 45 °C、模組間顯著失衡、通訊中斷 &gt; 24 小時）任一觸發即判定建議更換。</p><ul><li>權重為暫定值，將隨循環數據與樣本數持續校準。</li><li>每模組僅一個溫度感測器、無單芯電壓；對稱性以 B1／B2 比較作為替代指標。</li><li>壽命外推目前僅約 30 次穩定循環，應視為範圍而非精準數字。</li></ul>`;
+  html += foot + `</article>`;
+  if (secs.trend) charts.push(() => { const el = $('#rc-trend'); if (!el) return; const vals = series.map(x => x.avg), lo = Math.floor(Math.min(...vals) - 1), hi = Math.ceil(Math.max(...vals) + 1); const n = days.length; lineChart(el, {labels:days.map(d => fmtDate(new Date(now - d * DAY)).slice(5)), series:[{name:'平均健康分數', values:vals, color:'#0c6473'}], yMin:lo, yMax:hi, yTicks:[lo, Math.round((lo + hi) / 2), hi], h:190, ink:'#7a8a8d', grid:'#e3e9ea', surf:'#fff', tipFmt:f1, xTicks:n < 4 ? [...Array(n).keys()] : undefined, tipTitle:i => fmtDate(new Date(now - days[i] * DAY))}); });
+  const summary = `誠屏 EPB-1001 電池機隊報告（${period}，${scope}）\n` + summaryLines.map(l => '・' + l).join('\n');
+  return {title:'機隊健康與維護報告', period, scope, html, charts, summary, events:evs, created, file:`${id}_機隊報告`};
+}
+function exportHTML(rep){
+  const body = $('#rprev').innerHTML;
+  return `<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(rep.title)} ${esc(rep.period)}</title><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono&family=IBM+Plex+Sans:wght@400;600&family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet"><style>body{margin:0;padding:24px;background:#eef2f3}.report{margin:0 auto}.chart{position:relative}.chart svg{display:block;overflow:visible}.legend{display:none}@media print{body{background:#fff;padding:0}.report{border:0;box-shadow:none}}${$('#report-css').textContent}</style></head><body>${body}</body></html>`;
+}
+
+/* ============================================================
+   Router + global events
+   ============================================================ */
+const PAGES = {
+  overview:{t:'總覽', sub:() => `${scoped().length} 個 EPB-1001 電池模組即時狀態`, r:renderOverview},
+  maintenance:{t:'維護', sub:() => '依嚴重度排序的維護清單與建議處置', r:renderMaintenance},
+  batteries:{t:'電池列表', sub:() => '所有模組狀態明細，可搜尋、篩選與排序', r:renderBatteries},
+  assistant:{t:'AI 助理', sub:() => '以自然語言查詢診斷結果並建立工單', r:renderAssistant},
+  reports:{t:'報表', sub:() => '自訂時間區間產生機隊或單一模組報告', r:renderReports},
+};
+function route(){
+  const h = location.hash.slice(1);
+  S.route = PAGES[h] ? h : 'overview';
+  $$('.view').forEach(v => v.classList.toggle('on', v.id === 'v-' + S.route));
+  $$('#nav a').forEach(a => { if (a.dataset.r === S.route) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+  $('#pgTitle').textContent = PAGES[S.route].t; $('#pgSub').textContent = PAGES[S.route].sub();
+  hideTip();
+  PAGES[S.route].r();
+  $('#main').scrollTop = 0;
+}
+function updateBadge(){ const n = MODULES.filter(m => m.status === 'crit' && !openWO(m.id)).length; $('#navBadge').textContent = n || ''; $('#navBadge').style.display = n ? '' : 'none'; $('#navBadge').title = `${n} 個建議更換模組尚未建立工單`; }
+window.addEventListener('hashchange', route);
+SITES.forEach(s => $('#siteSel').insertAdjacentHTML('beforeend', `<option value="${s.id}">${s.name}</option>`));
+$('#siteSel').addEventListener('change', e => { S.site = e.target.value; S.list.page = 1; $('#pgSub').textContent = PAGES[S.route].sub(); if (S.route !== 'assistant' && S.route !== 'reports') PAGES[S.route].r(); else if (S.route === 'reports'){ $('#rsite').value = S.site; S.rep.site = S.site; } });
+document.addEventListener('click', e => {
+  const wo = e.target.closest('[data-wo]');
+  if (wo){ e.stopPropagation(); const w = createWO(wo.dataset.wo); toastMsg(`已建立工單 ${w.id}（${w.mid}）`); if (S.route === 'maintenance') renderMaintenance(); if (S.route === 'assistant') drawMsgs(); if (S.drawer === wo.dataset.wo) openDrawer(S.drawer); return; }
+  const ask2 = e.target.closest('[data-ask]');
+  if (ask2){ const id = ask2.dataset.ask; closeDrawer(); location.hash = 'assistant'; route(); ask(`請分析 ${id} 目前的狀況、原因與建議處置`); return; }
+  const mr = e.target.closest('[data-modrep]');
+  if (mr){ closeDrawer(); location.hash = 'reports'; route(); S.rep.type = 'module'; S.rep.mid = mr.dataset.modrep; $('#rtype').value = 'module'; $('#rmod').value = S.rep.mid; $('#rmodf').hidden = false; $('#rsecf').hidden = true; generate(); return; }
+  if (e.target.closest('[data-reset]')){ $('#lreset').click(); return; }
+  const op = e.target.closest('[data-open]');
+  if (op){ openDrawer(op.dataset.open); return; }
+  const go = e.target.closest('[data-go]');
+  if (go){ if (go.dataset.tab) S.maint.tab = go.dataset.tab; if (go.dataset.status){ S.list.status = go.dataset.status; S.list.page = 1; } if (location.hash.slice(1) === go.dataset.go) route(); else location.hash = go.dataset.go; return; }
+  const mt = e.target.closest('[data-mtab]');
+  if (mt){ S.maint.tab = mt.dataset.mtab; renderMaintenance(); return; }
+  const so = e.target.closest('[data-sort]');
+  if (so){ const k = so.dataset.sort; if (S.list.sort === k) S.list.dir *= -1; else { S.list.sort = k; S.list.dir = ['score','soh','cycles'].includes(k) ? 1 : k === 't' ? -1 : 1; } renderBatteries(); return; }
+  const pg = e.target.closest('[data-page]');
+  if (pg && !pg.disabled){ S.list.page = Number(pg.dataset.page); renderBatteries(); return; }
+  const rp = e.target.closest('[data-rep]');
+  if (rp){ showReport(Number(rp.dataset.rep)); }
+});
+let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (S.route === 'overview') renderOverview(); else if (S.route === 'maintenance') renderMaintenance(); else if (S.route === 'reports' && S.curRep != null) showReport(S.curRep); }, 200); });
+
+updateBadge();
+$('#clock').textContent = new Date().toLocaleTimeString('zh-TW', {hour12:false});
+route();
+setInterval(tick, 2000);
+</script>
+</body>
+</html>
